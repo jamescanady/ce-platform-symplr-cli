@@ -1,6 +1,6 @@
 # symplr CLI
 
-A cross-platform CLI for querying symplr Platform services. Modelled after `gh` and `aws`.
+A cross-platform CLI for querying symplr Platform services.
 
 ## Installation
 
