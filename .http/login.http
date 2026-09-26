@@ -1,0 +1,8 @@
+# @name login
+POST {{$dotenv pingFed_tokenURL}}
+Content-Type: application/x-www-form-urlencoded
+Accept:  application/json
+Authorization: Basic {{$dotenv pingFed_clientId}}:{{$dotenv pingFed_clientSecret}}
+
+grant_type=client_credentials
+&scope={{$dotenv pingFed_scope}}
