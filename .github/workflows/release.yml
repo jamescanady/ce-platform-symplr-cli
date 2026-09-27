@@ -25,7 +25,7 @@ jobs:
       matrix:
         rid: [win-x64, linux-x64, osx-x64, osx-arm64]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
       - uses: ./.github/actions/dotnet-publish
         with:
           rid: ${{ matrix.rid }}
@@ -40,24 +40,24 @@ jobs:
       contents: write
       pull-requests: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
 
       - name: Build changelog
         id: changelog
-        uses: mikepenz/release-changelog-builder-action@v6
+        uses: mikepenz/release-changelog-builder-action@v6.3.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8.0.1
         with:
           path: dist/
           merge-multiple: true
 
       - name: Create release
-        uses: mikepenz/action-gh-release@v1
+        uses: mikepenz/action-gh-release@v3.1.0
         with:
           name: v${{ needs.prepare.outputs.version }}
           body: ${{ steps.changelog.outputs.changelog }}

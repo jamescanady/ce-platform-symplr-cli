@@ -12,7 +12,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/setup-dotnet@v4
+    - uses: actions/setup-dotnet@v6.0.0
       with:
         dotnet-version: '10.x'
 
@@ -38,7 +38,7 @@ runs:
         fi
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7.0.1
       with:
         name: symplr-${{ inputs.rid }}
         path: symplr-${{ inputs.version }}-${{ inputs.rid }}.*
