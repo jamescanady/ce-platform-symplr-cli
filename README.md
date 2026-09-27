@@ -79,7 +79,29 @@ chmod +x install.sh
 
 ### Windows
 
-Download `symplr-<version>-win-x64.zip` from the [releases page](https://github.com/jamescanady/ce-platform-symplr-cli/releases), extract `symplr.exe`, and place it anywhere on your `PATH`.
+Run `install.ps1` from an elevated or standard PowerShell session. It downloads the latest release, extracts `symplr.exe` to `%LOCALAPPDATA%\Programs\symplr\`, and adds that directory to your user `PATH` automatically.
+
+```powershell
+# Latest release
+irm https://raw.githubusercontent.com/jamescanady/ce-platform-symplr-cli/main/install.ps1 | iex
+
+# Specific version
+irm https://raw.githubusercontent.com/jamescanady/ce-platform-symplr-cli/main/install.ps1 | iex -Args v1.2.3
+```
+
+Or download the script first if you want to inspect it before running:
+
+```powershell
+Invoke-WebRequest https://raw.githubusercontent.com/jamescanady/ce-platform-symplr-cli/main/install.ps1 -OutFile install.ps1
+.\install.ps1           # latest
+.\install.ps1 v1.2.3    # specific version
+```
+
+Restart your terminal after installation for the `PATH` change to take effect.
+
+**Supported platform:** `win-x64`
+
+> If your execution policy blocks unsigned scripts, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` first.
 
 ---
 
