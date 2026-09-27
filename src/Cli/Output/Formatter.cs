@@ -32,7 +32,7 @@ public static class Formatter
     {
         var parts = widths.Select((w, i) =>
         {
-            var cell = i < cells.Length ? cells[i] : "";
+            var cell = i < cells.Length ? cells[i].ReplaceLineEndings(" ") : "";
             if (cell.Length > w)
                 cell = cell[..(w - 1)] + "…";
             return cell.PadRight(w);
