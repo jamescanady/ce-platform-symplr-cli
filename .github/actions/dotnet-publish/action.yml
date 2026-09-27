@@ -33,7 +33,6 @@ runs:
         dotnet publish src/Cli \
           -r ${{ inputs.rid }} \
           -c Release \
-          --self-contained \
           -o dist/${{ inputs.rid }} \
           -p:Version=${{ inputs.version }}
 
