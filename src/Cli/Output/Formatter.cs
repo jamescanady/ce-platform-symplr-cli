@@ -7,6 +7,8 @@ public enum OutputFormat { Table, Json }
 
 public static class Formatter
 {
+    private const int MaxColumnWidth = 42;
+
     public static void PrintTable(string[] headers, IEnumerable<string[]> rows)
     {
         var allRows = rows.ToList();
@@ -18,7 +20,7 @@ public static class Formatter
         for (int i = 0; i < colCount; i++)
         {
             widths[i] = headers.Length > i ? headers[i].Length : 0;
-            widths[i] = Math.Max(widths[i], allRows.Max(r => i < r.Length ? r[i].Length : 0));
+            widths[i] = Math.Max(widths[i], allRows.Max(r => i < r.Length ? Math.Min(r[i].Length, MaxColumnWidth) : 0));
         }
 
         if (headers.Length > 0) PrintRow(headers, widths);
@@ -31,6 +33,8 @@ public static class Formatter
         var parts = widths.Select((w, i) =>
         {
             var cell = i < cells.Length ? cells[i] : "";
+            if (cell.Length > w)
+                cell = cell[..(w - 1)] + "…";
             return cell.PadRight(w);
         });
         Console.WriteLine(string.Join("  ", parts).TrimEnd());
