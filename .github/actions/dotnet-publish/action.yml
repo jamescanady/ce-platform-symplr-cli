@@ -16,6 +16,12 @@ runs:
       with:
         dotnet-version: '10.x'
 
+    # Native AOT on Windows needs MSVC cl.exe/link.exe in PATH.
+    # ilammy/msvc-dev-cmd activates the VS developer environment.
+    - name: Setup MSVC developer environment (Windows)
+      if: ${{ runner.os == 'Windows' }}
+      uses: ilammy/msvc-dev-cmd@v1
+
     - name: Install native AOT prerequisites (Linux)
       if: ${{ runner.os == 'Linux' }}
       shell: bash
@@ -29,7 +35,7 @@ runs:
           -c Release \
           --self-contained \
           -o dist/${{ inputs.rid }} \
-          /p:Version=${{ inputs.version }}
+          -p:Version=${{ inputs.version }}
 
     - name: Package
       shell: bash
@@ -37,7 +43,7 @@ runs:
         RID="${{ inputs.rid }}"
         VERSION="${{ inputs.version }}"
         if [[ "$RID" == win-* ]]; then
-          zip -j "symplr-${VERSION}-${RID}.zip" "dist/${RID}/symplr.exe"
+          7z a "symplr-${VERSION}-${RID}.zip" "./dist/${RID}/symplr.exe"
         else
           tar czf "symplr-${VERSION}-${RID}.tar.gz" -C "dist/${RID}" symplr
         fi
