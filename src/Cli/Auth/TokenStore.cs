@@ -5,6 +5,7 @@ using SymplrCli.Platform;
 namespace SymplrCli.Auth;
 
 public record StoredToken(string AccessToken, string? RefreshToken, DateTimeOffset ExpiresAt);
+public record StoredClientCredential(string ClientId, string ClientSecret);
 
 public class TokenStore
 {
@@ -26,6 +27,7 @@ public class TokenStore
         public string? ActiveEnvironment { get; set; }
         public Dictionary<string, string> PlatformHosts { get; set; } = [];
         public Dictionary<string, string> RoutePrefixes { get; set; } = [];
+        public Dictionary<string, StoredClientCredential> ClientCredentials { get; set; } = [];
     }
 
     public StoredToken? Load(SymplrEnvironment env)
@@ -108,6 +110,28 @@ public class TokenStore
     }
 
     public IReadOnlyDictionary<string, string> AllRoutePrefixes() => ReadConfig().RoutePrefixes;
+
+    // ─── client credentials ───────────────────────────────────────────────────
+
+    public StoredClientCredential? GetClientCredential(SymplrEnvironment env) =>
+        ReadConfig().ClientCredentials.TryGetValue(Key(env), out var c) ? c : null;
+
+    public void SetClientCredential(SymplrEnvironment env, string clientId, string clientSecret)
+    {
+        var config = ReadConfig();
+        config.ClientCredentials[Key(env)] = new StoredClientCredential(clientId, clientSecret);
+        WriteConfig(config);
+    }
+
+    public void UnsetClientCredential(SymplrEnvironment env)
+    {
+        var config = ReadConfig();
+        config.ClientCredentials.Remove(Key(env));
+        WriteConfig(config);
+    }
+
+    public IReadOnlyDictionary<string, StoredClientCredential> AllClientCredentials() =>
+        ReadConfig().ClientCredentials;
 
     private static string Key(SymplrEnvironment env) => env.ToString().ToLowerInvariant();
 

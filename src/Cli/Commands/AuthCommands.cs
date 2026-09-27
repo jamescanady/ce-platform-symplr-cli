@@ -13,20 +13,28 @@ public static class AuthCommands
     {
         var auth = new Command("auth", "Authenticate with symplr Platform");
         auth.AddCommand(BuildLogin(envOption));
+        auth.AddCommand(BuildToken(envOption));
         auth.AddCommand(BuildLogout(envOption));
         auth.AddCommand(BuildStatus());
         auth.AddCommand(BuildSwitch());
         return auth;
     }
 
+    // ── auth login ────────────────────────────────────────────────────────────
+    // Interactive device flow. --token skips the browser for users who already
+    // have a bearer token in hand.
+
     private static Command BuildLogin(Option<SymplrEnvironment> envOption)
     {
         var tokenOption = new Option<string?>("--token", "Skip browser flow and store this Bearer token directly");
-        var cmd = new Command("login", "Log in to symplr Platform (opens browser for SSO)");
+
+        var cmd = new Command("login", "Log in interactively via device flow (opens browser)");
         cmd.AddOption(tokenOption);
+
         cmd.SetHandler(async (env, rawToken) =>
         {
-            var store = new TokenStore();
+            var store  = new TokenStore();
+            var config = EnvironmentConfig.For(env);
 
             if (rawToken is not null)
             {
@@ -35,21 +43,19 @@ public static class AuthCommands
                 return;
             }
 
-            var config = EnvironmentConfig.For(env);
-            var flow = new DeviceFlowClient(new HttpClient());
-
             Console.WriteLine($"Logging in to symplr Platform ({env})...");
 
             TokenResponse? token;
             try
             {
-                token = await flow.LoginAsync(config, (userCode, verificationUri) =>
-                {
-                    Console.WriteLine($"Open your browser to: {verificationUri}");
-                    Console.WriteLine($"Enter the code:       {userCode}");
-                    Console.WriteLine("Waiting for authentication...");
-                    OpenBrowser(verificationUri);
-                });
+                token = await new DeviceFlowClient(new HttpClient())
+                    .LoginAsync(config, (userCode, verificationUri) =>
+                    {
+                        Console.WriteLine($"Open your browser to: {verificationUri}");
+                        Console.WriteLine($"Enter the code:       {userCode}");
+                        Console.WriteLine("Waiting for authentication...");
+                        OpenBrowser(verificationUri);
+                    });
             }
             catch (InvalidOperationException ex)
             {
@@ -74,6 +80,65 @@ public static class AuthCommands
         return cmd;
     }
 
+    // ── auth token ────────────────────────────────────────────────────────────
+    // Non-interactive client credentials flow for service accounts / CI.
+    // Flags take priority; falls back to credentials stored via
+    // 'symplr config set client-id / client-secret'.
+
+    private static Command BuildToken(Option<SymplrEnvironment> envOption)
+    {
+        var clientIdOption = new Option<string?>("--client-id",     "OAuth client ID (overrides stored value)");
+        var secretOption   = new Option<string?>("--client-secret", "OAuth client secret (overrides stored value)");
+        var scopeOption    = new Option<string?>("--scope",         "OAuth scope (optional; server uses client defaults if omitted)");
+
+        var cmd = new Command("token", "Obtain a token via client credentials (non-interactive)");
+        cmd.AddOption(clientIdOption);
+        cmd.AddOption(secretOption);
+        cmd.AddOption(scopeOption);
+
+        cmd.SetHandler(async (env, clientId, clientSecret, scope) =>
+        {
+            var store = new TokenStore();
+            var stored = store.GetClientCredential(env);
+
+            var resolvedId     = clientId     ?? stored?.ClientId;
+            var resolvedSecret = clientSecret ?? stored?.ClientSecret;
+
+            if (resolvedId is null || resolvedSecret is null)
+            {
+                Formatter.Error(
+                    resolvedId is null && resolvedSecret is null
+                        ? $"No client credentials for {env}. Provide --client-id / --client-secret or run: symplr config set client-id / client-secret"
+                        : resolvedId is null
+                            ? "Missing --client-id (not stored). Run: symplr config set client-id <id>"
+                            : "Missing --client-secret (not stored). Run: symplr config set client-secret <secret>");
+                return;
+            }
+
+            TokenResponse token;
+            try
+            {
+                token = await new ClientCredentialsFlowClient(new HttpClient())
+                    .LoginAsync(EnvironmentConfig.For(env), resolvedId, resolvedSecret, scope);
+            }
+            catch (HttpRequestException ex)
+            {
+                Formatter.Error($"Token request failed: {(int?)ex.StatusCode} {ex.Message}");
+                return;
+            }
+
+            store.Save(env, new StoredToken(
+                token.AccessToken,
+                token.RefreshToken,
+                DateTimeOffset.UtcNow.AddSeconds(token.ExpiresIn)));
+
+            Console.WriteLine($"Token stored for {env} (expires in {token.ExpiresIn}s).");
+        }, envOption, clientIdOption, secretOption, scopeOption);
+        return cmd;
+    }
+
+    // ── auth logout ───────────────────────────────────────────────────────────
+
     private static Command BuildLogout(Option<SymplrEnvironment> envOption)
     {
         var cmd = new Command("logout", "Log out and revoke the stored token");
@@ -84,8 +149,7 @@ public static class AuthCommands
             if (stored is null) { Console.WriteLine($"Not logged in to {env}."); return; }
 
             var config = EnvironmentConfig.For(env);
-            var flow = new DeviceFlowClient(new HttpClient());
-            try { await flow.RevokeAsync(config, stored.AccessToken); }
+            try { await new DeviceFlowClient(new HttpClient()).RevokeAsync(config, stored.AccessToken); }
             catch { /* best-effort revocation */ }
 
             store.Remove(env);
@@ -93,6 +157,8 @@ public static class AuthCommands
         }, envOption);
         return cmd;
     }
+
+    // ── auth status ───────────────────────────────────────────────────────────
 
     private static Command BuildStatus()
     {
@@ -121,6 +187,8 @@ public static class AuthCommands
         });
         return cmd;
     }
+
+    // ── auth switch ───────────────────────────────────────────────────────────
 
     private static Command BuildSwitch()
     {

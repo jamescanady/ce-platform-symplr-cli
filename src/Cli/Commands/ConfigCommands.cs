@@ -55,6 +55,21 @@ public static class ConfigCommands
                 Console.WriteLine();
             }
 
+            var credentials = store.AllClientCredentials();
+            if (credentials.Count > 0)
+            {
+                Console.WriteLine("Client credentials:");
+                Formatter.PrintTable(
+                    ["  ENVIRONMENT", "CLIENT ID", "SECRET"],
+                    credentials.Select(kv => new[]
+                    {
+                        $"  {kv.Key}",
+                        kv.Value.ClientId,
+                        $"****{kv.Value.ClientSecret[^Math.Min(4, kv.Value.ClientSecret.Length)..]}",
+                    }));
+                Console.WriteLine();
+            }
+
             if (sessions.Count == 0)
             {
                 Console.WriteLine("No stored sessions. Run: symplr auth login");
@@ -89,6 +104,8 @@ public static class ConfigCommands
         var set = new Command("set", "Set a configuration override");
         set.AddCommand(BuildSetPlatformHostCommand(envOption));
         set.AddCommand(BuildSetRoutePrefixCommand());
+        set.AddCommand(BuildSetClientIdCommand(envOption));
+        set.AddCommand(BuildSetClientSecretCommand(envOption));
         return set;
     }
 
@@ -121,6 +138,40 @@ public static class ConfigCommands
         return cmd;
     }
 
+    private static Command BuildSetClientIdCommand(Option<SymplrEnvironment> envOption)
+    {
+        var idArg = new Argument<string>("client-id", "OAuth client ID");
+        var cmd = new Command("client-id", "Store the client ID for client credentials login");
+        cmd.AddArgument(idArg);
+        cmd.SetHandler((env, id) =>
+        {
+            var store = new TokenStore();
+            var existing = store.GetClientCredential(env);
+            store.SetClientCredential(env, id, existing?.ClientSecret ?? "");
+            Console.WriteLine($"Client ID for {env} set to: {id}");
+            if (existing?.ClientSecret is null or "")
+                Console.WriteLine($"  Run 'symplr config set client-secret' to complete the configuration.");
+        }, envOption, idArg);
+        return cmd;
+    }
+
+    private static Command BuildSetClientSecretCommand(Option<SymplrEnvironment> envOption)
+    {
+        var secretArg = new Argument<string>("client-secret", "OAuth client secret");
+        var cmd = new Command("client-secret", "Store the client secret for client credentials login");
+        cmd.AddArgument(secretArg);
+        cmd.SetHandler((env, secret) =>
+        {
+            var store = new TokenStore();
+            var existing = store.GetClientCredential(env);
+            store.SetClientCredential(env, existing?.ClientId ?? "", secret);
+            Console.WriteLine($"Client secret for {env} stored.");
+            if (existing?.ClientId is null or "")
+                Console.WriteLine($"  Run 'symplr config set client-id' to complete the configuration.");
+        }, envOption, secretArg);
+        return cmd;
+    }
+
     // ─── unset ───────────────────────────────────────────────────────────────
 
     private static Command BuildUnsetCommand(Option<SymplrEnvironment> envOption)
@@ -128,6 +179,7 @@ public static class ConfigCommands
         var unset = new Command("unset", "Remove a configuration override (restores default)");
         unset.AddCommand(BuildUnsetPlatformHostCommand(envOption));
         unset.AddCommand(BuildUnsetRoutePrefixCommand());
+        unset.AddCommand(BuildUnsetClientCredentialsCommand(envOption));
         return unset;
     }
 
@@ -152,6 +204,17 @@ public static class ConfigCommands
             new TokenStore().UnsetRoutePrefix(service);
             Console.WriteLine($"Route prefix override for '{service}' removed.");
         }, serviceArg);
+        return cmd;
+    }
+
+    private static Command BuildUnsetClientCredentialsCommand(Option<SymplrEnvironment> envOption)
+    {
+        var cmd = new Command("client-credentials", "Remove stored client credentials for an environment");
+        cmd.SetHandler((env) =>
+        {
+            new TokenStore().UnsetClientCredential(env);
+            Console.WriteLine($"Client credentials for {env} removed. 'symplr auth login' will use device flow.");
+        }, envOption);
         return cmd;
     }
 }
