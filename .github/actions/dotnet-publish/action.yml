@@ -20,7 +20,7 @@ runs:
     # ilammy/msvc-dev-cmd activates the VS developer environment.
     - name: Setup MSVC developer environment (Windows)
       if: ${{ runner.os == 'Windows' }}
-      uses: ilammy/msvc-dev-cmd@v1
+      uses: ilammy/msvc-dev-cmd@v1.13.0
 
     - name: Install native AOT prerequisites (Linux)
       if: ${{ runner.os == 'Linux' }}

@@ -177,16 +177,16 @@ public static class ConfigCommands
 
     private static Command BuildSetClientSecretCommand(Option<SymplrEnvironment> envOption)
     {
-        var secretArg = new Argument<string>("client-secret")
-        {
-            Description = "OAuth client secret",
-        };
-        var cmd = new Command("client-secret", "Store the client secret for client credentials login");
-        cmd.Arguments.Add(secretArg);
+        var cmd = new Command("client-secret", "Prompt for and store the client secret for client credentials login");
         cmd.SetAction(parseResult =>
         {
             var env      = parseResult.GetValue(envOption);
-            var secret   = parseResult.GetValue(secretArg)!;
+            var secret   = ReadMaskedInput("Client secret: ");
+            if (secret.Length == 0)
+            {
+                Formatter.Error("No secret entered — aborted.");
+                return;
+            }
             var store    = new TokenStore();
             var existing = store.GetClientCredential(env);
             store.SetClientCredential(env, existing?.ClientId ?? "", secret);
@@ -195,6 +195,32 @@ public static class ConfigCommands
                 Console.WriteLine("  Run 'symplr config set client-id' to complete the configuration.");
         });
         return cmd;
+    }
+
+    private static string ReadMaskedInput(string prompt)
+    {
+        Console.Write(prompt);
+        var sb = new System.Text.StringBuilder();
+        while (true)
+        {
+            var key = Console.ReadKey(intercept: true);
+            if (key.Key == ConsoleKey.Enter)
+            {
+                Console.WriteLine();
+                break;
+            }
+            if (key.Key == ConsoleKey.Backspace && sb.Length > 0)
+            {
+                sb.Remove(sb.Length - 1, 1);
+                Console.Write("\b \b");
+            }
+            else if (!char.IsControl(key.KeyChar))
+            {
+                sb.Append(key.KeyChar);
+                Console.Write('*');
+            }
+        }
+        return sb.ToString();
     }
 
     // ─── unset ───────────────────────────────────────────────────────────────
