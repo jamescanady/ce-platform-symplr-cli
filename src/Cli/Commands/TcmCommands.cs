@@ -16,42 +16,42 @@ public static class TcmCommands
         var tcm = new Command("tcm", "Tenant Configuration Management");
 
         var tenants = new Command("tenants", "Manage tenants");
-        tenants.AddCommand(BuildTenantsListCommand(envOption));
-        tenants.AddCommand(BuildTenantsGetCommand(envOption));
-        tenants.AddCommand(BuildTenantsSearchCommand(envOption));
-        tenants.AddCommand(BuildTenantsNamespacesCommand(envOption));
+        tenants.Subcommands.Add(BuildTenantsListCommand(envOption));
+        tenants.Subcommands.Add(BuildTenantsGetCommand(envOption));
+        tenants.Subcommands.Add(BuildTenantsSearchCommand(envOption));
+        tenants.Subcommands.Add(BuildTenantsNamespacesCommand(envOption));
 
         var namespaces = new Command("namespaces", "Manage namespaces");
-        namespaces.AddCommand(BuildNamespacesListCommand(envOption));
-        namespaces.AddCommand(BuildNamespacesGetCommand(envOption));
+        namespaces.Subcommands.Add(BuildNamespacesListCommand(envOption));
+        namespaces.Subcommands.Add(BuildNamespacesGetCommand(envOption));
 
         var products = new Command("products", "Manage products");
-        products.AddCommand(BuildProductsListCommand(envOption));
-        products.AddCommand(BuildProductsGetCommand(envOption));
-        products.AddCommand(BuildProductsSearchCommand(envOption));
-        products.AddCommand(BuildProductsTenantsCommand(envOption));
-        products.AddCommand(BuildProductsEnvironmentsCommand(envOption));
+        products.Subcommands.Add(BuildProductsListCommand(envOption));
+        products.Subcommands.Add(BuildProductsGetCommand(envOption));
+        products.Subcommands.Add(BuildProductsSearchCommand(envOption));
+        products.Subcommands.Add(BuildProductsTenantsCommand(envOption));
+        products.Subcommands.Add(BuildProductsEnvironmentsCommand(envOption));
 
         var eventConsumers = new Command("event-consumers", "Manage event consumers");
-        eventConsumers.AddCommand(BuildEventConsumersListCommand(envOption));
-        eventConsumers.AddCommand(BuildEventConsumersGetCommand(envOption));
+        eventConsumers.Subcommands.Add(BuildEventConsumersListCommand(envOption));
+        eventConsumers.Subcommands.Add(BuildEventConsumersGetCommand(envOption));
 
         var eventTypes = new Command("event-types", "Manage event types");
-        eventTypes.AddCommand(BuildEventTypesListCommand(envOption));
-        eventTypes.AddCommand(BuildEventTypesGetCommand(envOption));
+        eventTypes.Subcommands.Add(BuildEventTypesListCommand(envOption));
+        eventTypes.Subcommands.Add(BuildEventTypesGetCommand(envOption));
 
         var eventTypeConsumers = new Command("event-type-consumers", "Manage event type consumer mappings");
-        eventTypeConsumers.AddCommand(BuildEventTypeConsumersListCommand(envOption));
-        eventTypeConsumers.AddCommand(BuildEventTypeConsumersGetCommand(envOption));
-        eventTypeConsumers.AddCommand(BuildEventTypeConsumersByConsumerCommand(envOption));
+        eventTypeConsumers.Subcommands.Add(BuildEventTypeConsumersListCommand(envOption));
+        eventTypeConsumers.Subcommands.Add(BuildEventTypeConsumersGetCommand(envOption));
+        eventTypeConsumers.Subcommands.Add(BuildEventTypeConsumersByConsumerCommand(envOption));
 
-        tcm.AddCommand(tenants);
-        tcm.AddCommand(namespaces);
-        tcm.AddCommand(products);
-        tcm.AddCommand(eventConsumers);
-        tcm.AddCommand(eventTypes);
-        tcm.AddCommand(eventTypeConsumers);
-        tcm.AddCommand(VersionCommands.BuildSubCommand(envOption, ServiceKey, DefaultRoutePrefix));
+        tcm.Subcommands.Add(tenants);
+        tcm.Subcommands.Add(namespaces);
+        tcm.Subcommands.Add(products);
+        tcm.Subcommands.Add(eventConsumers);
+        tcm.Subcommands.Add(eventTypes);
+        tcm.Subcommands.Add(eventTypeConsumers);
+        tcm.Subcommands.Add(VersionCommands.BuildSubCommand(envOption, ServiceKey, DefaultRoutePrefix));
         return tcm;
     }
 
@@ -59,19 +59,29 @@ public static class TcmCommands
 
     private static Command BuildTenantsListCommand(Option<SymplrEnvironment> envOption)
     {
-        var withProducts = new Option<bool>("--with-products", "Include product relationships");
+        var withProducts = new Option<bool>("--with-products")
+        {
+            Description = "Include product relationships",
+        };
         var output = OutputOption();
         var cmd = new Command("list", "List all tenants");
-        cmd.AddOption(withProducts);
-        cmd.AddOption(output);
-        cmd.SetHandler(async (env, wp, fmt) =>
+        cmd.Options.Add(withProducts);
+        cmd.Options.Add(output);
+        cmd.SetAction(async (parseResult, ct) =>
         {
+            var env = parseResult.GetValue(envOption);
+            var wp  = parseResult.GetValue(withProducts);
+            var fmt = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var tenants = await client.GetTenantsAsync(wp);
                 if (tenants is null || tenants.Length == 0) { Console.WriteLine("No tenants found."); return; }
 
-                if (fmt == OutputFormat.Json) { Formatter.PrintJson(tenants); return; }
+                if (fmt == OutputFormat.Json)
+                {
+                    Formatter.PrintJson(tenants, SymplrJsonContext.Default.TenantResponseArray);
+                    return;
+                }
 
                 Formatter.PrintTable(
                     ["ID", "NAME", "SHORT CODE", "GLOBAL CODE", "DISABLED"],
@@ -84,51 +94,72 @@ public static class TcmCommands
                         t.IsDisabled ? "yes" : "no",
                     }));
             });
-        }, envOption, withProducts, output);
+        });
         return cmd;
     }
 
     private static Command BuildTenantsGetCommand(Option<SymplrEnvironment> envOption)
     {
-        var idArg = new Argument<Guid>("id", "Tenant ID (UUID)");
-        var withProducts = new Option<bool>("--with-products", "Include product relationships");
+        var idArg = new Argument<Guid>("id") { Description = "Tenant ID (UUID)" };
+        var withProducts = new Option<bool>("--with-products")
+        {
+            Description = "Include product relationships",
+        };
         var output = OutputOption();
         var cmd = new Command("get", "Get a tenant by ID");
-        cmd.AddArgument(idArg);
-        cmd.AddOption(withProducts);
-        cmd.AddOption(output);
-        cmd.SetHandler(async (env, id, wp, fmt) =>
+        cmd.Arguments.Add(idArg);
+        cmd.Options.Add(withProducts);
+        cmd.Options.Add(output);
+        cmd.SetAction(async (parseResult, ct) =>
         {
+            var env = parseResult.GetValue(envOption);
+            var id  = parseResult.GetValue(idArg);
+            var wp  = parseResult.GetValue(withProducts);
+            var fmt = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var tenant = await client.GetTenantAsync(id, wp);
                 if (tenant is null) { Formatter.Error($"Tenant {id} not found."); return; }
 
-                if (fmt == OutputFormat.Json) { Formatter.PrintJson(tenant); return; }
+                if (fmt == OutputFormat.Json)
+                {
+                    Formatter.PrintJson(tenant, SymplrJsonContext.Default.TenantResponse);
+                    return;
+                }
 
                 Formatter.PrintTable(
                     ["FIELD", "VALUE"],
                     TenantFields(tenant));
             });
-        }, envOption, idArg, withProducts, output);
+        });
         return cmd;
     }
 
     private static Command BuildTenantsSearchCommand(Option<SymplrEnvironment> envOption)
     {
-        var needleArg = new Argument<string>("query", "Search against name, description, shortCode, and globalTenantCode");
+        var needleArg = new Argument<string>("query")
+        {
+            Description = "Search against name, description, shortCode, and globalTenantCode",
+        };
         var output = OutputOption();
         var cmd = new Command("search", "Search tenants by name, short code, or global code");
-        cmd.AddArgument(needleArg);
-        cmd.AddOption(output);
-        cmd.SetHandler(async (env, needle, fmt) =>
+        cmd.Arguments.Add(needleArg);
+        cmd.Options.Add(output);
+        cmd.SetAction(async (parseResult, ct) =>
         {
+            var env    = parseResult.GetValue(envOption);
+            var needle = parseResult.GetValue(needleArg)!;
+            var fmt    = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var tenants = await client.FindTenantsAsync(needle);
                 if (tenants is null || tenants.Length == 0) { Console.WriteLine("No matching tenants."); return; }
 
-                if (fmt == OutputFormat.Json) { Formatter.PrintJson(tenants); return; }
+                if (fmt == OutputFormat.Json)
+                {
+                    Formatter.PrintJson(tenants, SymplrJsonContext.Default.TenantResponseArray);
+                    return;
+                }
 
                 Formatter.PrintTable(
                     ["ID", "NAME", "SHORT CODE", "GLOBAL CODE", "DISABLED"],
@@ -141,25 +172,32 @@ public static class TcmCommands
                         t.IsDisabled ? "yes" : "no",
                     }));
             });
-        }, envOption, needleArg, output);
+        });
         return cmd;
     }
 
     private static Command BuildTenantsNamespacesCommand(Option<SymplrEnvironment> envOption)
     {
-        var idArg = new Argument<Guid>("id", "Tenant ID (UUID)");
+        var idArg  = new Argument<Guid>("id") { Description = "Tenant ID (UUID)" };
         var output = OutputOption();
-        var cmd = new Command("namespaces", "List namespaces and product environments for a tenant");
-        cmd.AddArgument(idArg);
-        cmd.AddOption(output);
-        cmd.SetHandler(async (env, id, fmt) =>
+        var cmd    = new Command("namespaces", "List namespaces and product environments for a tenant");
+        cmd.Arguments.Add(idArg);
+        cmd.Options.Add(output);
+        cmd.SetAction(async (parseResult, ct) =>
         {
+            var env = parseResult.GetValue(envOption);
+            var id  = parseResult.GetValue(idArg);
+            var fmt = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var results = await client.GetTenantNamespacesAsync(id);
                 if (results is null || results.Length == 0) { Console.WriteLine("No namespaces found for tenant."); return; }
 
-                if (fmt == OutputFormat.Json) { Formatter.PrintJson(results); return; }
+                if (fmt == OutputFormat.Json)
+                {
+                    Formatter.PrintJson(results, SymplrJsonContext.Default.TenantNamespaceResponseArray);
+                    return;
+                }
 
                 foreach (var tenant in results)
                 {
@@ -178,7 +216,7 @@ public static class TcmCommands
                     }
                 }
             });
-        }, envOption, idArg, output);
+        });
         return cmd;
     }
 
@@ -186,19 +224,29 @@ public static class TcmCommands
 
     private static Command BuildNamespacesListCommand(Option<SymplrEnvironment> envOption)
     {
-        var includeInactive = new Option<bool>("--include-inactive", "Include disabled/deleted namespaces");
-        var output = OutputOption();
-        var cmd = new Command("list", "List all namespaces");
-        cmd.AddOption(includeInactive);
-        cmd.AddOption(output);
-        cmd.SetHandler(async (env, inactive, fmt) =>
+        var includeInactive = new Option<bool>("--include-inactive")
         {
+            Description = "Include disabled/deleted namespaces",
+        };
+        var output = OutputOption();
+        var cmd    = new Command("list", "List all namespaces");
+        cmd.Options.Add(includeInactive);
+        cmd.Options.Add(output);
+        cmd.SetAction(async (parseResult, ct) =>
+        {
+            var env      = parseResult.GetValue(envOption);
+            var inactive = parseResult.GetValue(includeInactive);
+            var fmt      = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var namespaces = await client.GetNamespacesAsync(inactive);
                 if (namespaces is null || namespaces.Length == 0) { Console.WriteLine("No namespaces found."); return; }
 
-                if (fmt == OutputFormat.Json) { Formatter.PrintJson(namespaces); return; }
+                if (fmt == OutputFormat.Json)
+                {
+                    Formatter.PrintJson(namespaces, SymplrJsonContext.Default.NamespaceResponseArray);
+                    return;
+                }
 
                 Formatter.PrintTable(
                     ["ID", "NAME", "DESCRIPTION", "DEFAULT", "DISABLED"],
@@ -211,25 +259,32 @@ public static class TcmCommands
                         n.IsDisabled ? "yes" : "no",
                     }));
             });
-        }, envOption, includeInactive, output);
+        });
         return cmd;
     }
 
     private static Command BuildNamespacesGetCommand(Option<SymplrEnvironment> envOption)
     {
-        var idArg = new Argument<Guid>("id", "Namespace ID (UUID)");
+        var idArg  = new Argument<Guid>("id") { Description = "Namespace ID (UUID)" };
         var output = OutputOption();
-        var cmd = new Command("get", "Get a namespace by ID");
-        cmd.AddArgument(idArg);
-        cmd.AddOption(output);
-        cmd.SetHandler(async (env, id, fmt) =>
+        var cmd    = new Command("get", "Get a namespace by ID");
+        cmd.Arguments.Add(idArg);
+        cmd.Options.Add(output);
+        cmd.SetAction(async (parseResult, ct) =>
         {
+            var env = parseResult.GetValue(envOption);
+            var id  = parseResult.GetValue(idArg);
+            var fmt = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var ns = await client.GetNamespaceAsync(id);
                 if (ns is null) { Formatter.Error($"Namespace {id} not found."); return; }
 
-                if (fmt == OutputFormat.Json) { Formatter.PrintJson(ns); return; }
+                if (fmt == OutputFormat.Json)
+                {
+                    Formatter.PrintJson(ns, SymplrJsonContext.Default.NamespaceResponse);
+                    return;
+                }
 
                 Formatter.PrintTable(
                     ["FIELD", "VALUE"],
@@ -245,7 +300,7 @@ public static class TcmCommands
                         ["Modified By",  ns.LastModifiedBy ?? ""],
                     ]);
             });
-        }, envOption, idArg, output);
+        });
         return cmd;
     }
 
@@ -254,16 +309,22 @@ public static class TcmCommands
     private static Command BuildProductsListCommand(Option<SymplrEnvironment> envOption)
     {
         var output = OutputOption();
-        var cmd = new Command("list", "List all products");
-        cmd.AddOption(output);
-        cmd.SetHandler(async (env, fmt) =>
+        var cmd    = new Command("list", "List all products");
+        cmd.Options.Add(output);
+        cmd.SetAction(async (parseResult, ct) =>
         {
+            var env = parseResult.GetValue(envOption);
+            var fmt = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var products = await client.GetProductsAsync();
                 if (products is null || products.Length == 0) { Console.WriteLine("No products found."); return; }
 
-                if (fmt == OutputFormat.Json) { Formatter.PrintJson(products); return; }
+                if (fmt == OutputFormat.Json)
+                {
+                    Formatter.PrintJson(products, SymplrJsonContext.Default.ProductResponseArray);
+                    return;
+                }
 
                 Formatter.PrintTable(
                     ["ID", "NAME", "DESCRIPTION", "DISABLED"],
@@ -275,25 +336,32 @@ public static class TcmCommands
                         p.IsDisabled ? "yes" : "no",
                     }));
             });
-        }, envOption, output);
+        });
         return cmd;
     }
 
     private static Command BuildProductsGetCommand(Option<SymplrEnvironment> envOption)
     {
-        var idArg = new Argument<Guid>("id", "Product ID (UUID)");
+        var idArg  = new Argument<Guid>("id") { Description = "Product ID (UUID)" };
         var output = OutputOption();
-        var cmd = new Command("get", "Get a product by ID");
-        cmd.AddArgument(idArg);
-        cmd.AddOption(output);
-        cmd.SetHandler(async (env, id, fmt) =>
+        var cmd    = new Command("get", "Get a product by ID");
+        cmd.Arguments.Add(idArg);
+        cmd.Options.Add(output);
+        cmd.SetAction(async (parseResult, ct) =>
         {
+            var env = parseResult.GetValue(envOption);
+            var id  = parseResult.GetValue(idArg);
+            var fmt = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var product = await client.GetProductAsync(id);
                 if (product is null) { Formatter.Error($"Product {id} not found."); return; }
 
-                if (fmt == OutputFormat.Json) { Formatter.PrintJson(product); return; }
+                if (fmt == OutputFormat.Json)
+                {
+                    Formatter.PrintJson(product, SymplrJsonContext.Default.ProductResponse);
+                    return;
+                }
 
                 Formatter.PrintTable(
                     ["FIELD", "VALUE"],
@@ -304,25 +372,32 @@ public static class TcmCommands
                         ["Disabled",    product.IsDisabled ? "yes" : "no"],
                     ]);
             });
-        }, envOption, idArg, output);
+        });
         return cmd;
     }
 
     private static Command BuildProductsSearchCommand(Option<SymplrEnvironment> envOption)
     {
-        var needleArg = new Argument<string>("query", "Search against product name");
-        var output = OutputOption();
-        var cmd = new Command("search", "Search products by name");
-        cmd.AddArgument(needleArg);
-        cmd.AddOption(output);
-        cmd.SetHandler(async (env, needle, fmt) =>
+        var needleArg = new Argument<string>("query") { Description = "Search against product name" };
+        var output    = OutputOption();
+        var cmd       = new Command("search", "Search products by name");
+        cmd.Arguments.Add(needleArg);
+        cmd.Options.Add(output);
+        cmd.SetAction(async (parseResult, ct) =>
         {
+            var env    = parseResult.GetValue(envOption);
+            var needle = parseResult.GetValue(needleArg)!;
+            var fmt    = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var products = await client.FindProductsAsync(needle);
                 if (products is null || products.Length == 0) { Console.WriteLine("No matching products."); return; }
 
-                if (fmt == OutputFormat.Json) { Formatter.PrintJson(products); return; }
+                if (fmt == OutputFormat.Json)
+                {
+                    Formatter.PrintJson(products, SymplrJsonContext.Default.ProductResponseArray);
+                    return;
+                }
 
                 Formatter.PrintTable(
                     ["ID", "NAME", "DESCRIPTION", "DISABLED"],
@@ -334,29 +409,38 @@ public static class TcmCommands
                         p.IsDisabled ? "yes" : "no",
                     }));
             });
-        }, envOption, needleArg, output);
+        });
         return cmd;
     }
 
     private static Command BuildProductsTenantsCommand(Option<SymplrEnvironment> envOption)
     {
-        var idArg = new Argument<Guid>("id", "Product ID (UUID)");
-        var filterOption = new Option<string?>("--filter", "Filter by tenant name, short code, or global code");
-        var namespaceOption = new Option<string?>("--namespace", "Filter by namespace name");
-        var output = OutputOption();
-        var cmd = new Command("tenants", "List tenants using a product");
-        cmd.AddArgument(idArg);
-        cmd.AddOption(filterOption);
-        cmd.AddOption(namespaceOption);
-        cmd.AddOption(output);
-        cmd.SetHandler(async (env, id, filter, ns, fmt) =>
+        var idArg           = new Argument<Guid>("id") { Description = "Product ID (UUID)" };
+        var filterOption    = new Option<string?>("--filter") { Description = "Filter by tenant name, short code, or global code" };
+        var namespaceOption = new Option<string?>("--namespace") { Description = "Filter by namespace name" };
+        var output          = OutputOption();
+        var cmd             = new Command("tenants", "List tenants using a product");
+        cmd.Arguments.Add(idArg);
+        cmd.Options.Add(filterOption);
+        cmd.Options.Add(namespaceOption);
+        cmd.Options.Add(output);
+        cmd.SetAction(async (parseResult, ct) =>
         {
+            var env = parseResult.GetValue(envOption);
+            var id  = parseResult.GetValue(idArg);
+            var filter = parseResult.GetValue(filterOption);
+            var ns  = parseResult.GetValue(namespaceOption);
+            var fmt = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var tenants = await client.GetTenantsByProductAsync(id, filter, ns);
                 if (tenants is null || tenants.Length == 0) { Console.WriteLine("No tenants found for product."); return; }
 
-                if (fmt == OutputFormat.Json) { Formatter.PrintJson(tenants); return; }
+                if (fmt == OutputFormat.Json)
+                {
+                    Formatter.PrintJson(tenants, SymplrJsonContext.Default.TenantByProductResponseArray);
+                    return;
+                }
 
                 Formatter.PrintTable(
                     ["TENANT ID", "NAME", "SHORT CODE", "NAMESPACE", "ENVIRONMENT"],
@@ -369,25 +453,32 @@ public static class TcmCommands
                         t.EnvironmentName ?? "",
                     }));
             });
-        }, envOption, idArg, filterOption, namespaceOption, output);
+        });
         return cmd;
     }
 
     private static Command BuildProductsEnvironmentsCommand(Option<SymplrEnvironment> envOption)
     {
-        var idArg = new Argument<Guid>("id", "Product ID (UUID)");
+        var idArg  = new Argument<Guid>("id") { Description = "Product ID (UUID)" };
         var output = OutputOption();
-        var cmd = new Command("environments", "List environments for a product");
-        cmd.AddArgument(idArg);
-        cmd.AddOption(output);
-        cmd.SetHandler(async (env, id, fmt) =>
+        var cmd    = new Command("environments", "List environments for a product");
+        cmd.Arguments.Add(idArg);
+        cmd.Options.Add(output);
+        cmd.SetAction(async (parseResult, ct) =>
         {
+            var env = parseResult.GetValue(envOption);
+            var id  = parseResult.GetValue(idArg);
+            var fmt = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var envs = await client.GetProductEnvironmentsAsync(id);
                 if (envs is null || envs.Length == 0) { Console.WriteLine("No environments found for product."); return; }
 
-                if (fmt == OutputFormat.Json) { Formatter.PrintJson(envs); return; }
+                if (fmt == OutputFormat.Json)
+                {
+                    Formatter.PrintJson(envs, SymplrJsonContext.Default.ProductEnvironmentResponseArray);
+                    return;
+                }
 
                 Formatter.PrintTable(
                     ["ID", "NAME", "DISABLED"],
@@ -398,7 +489,7 @@ public static class TcmCommands
                         e.IsDisabled ? "yes" : "no",
                     }));
             });
-        }, envOption, idArg, output);
+        });
         return cmd;
     }
 
@@ -407,16 +498,22 @@ public static class TcmCommands
     private static Command BuildEventConsumersListCommand(Option<SymplrEnvironment> envOption)
     {
         var output = OutputOption();
-        var cmd = new Command("list", "List all event consumers");
-        cmd.AddOption(output);
-        cmd.SetHandler(async (env, fmt) =>
+        var cmd    = new Command("list", "List all event consumers");
+        cmd.Options.Add(output);
+        cmd.SetAction(async (parseResult, ct) =>
         {
+            var env = parseResult.GetValue(envOption);
+            var fmt = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var consumers = await client.GetEventConsumersAsync();
                 if (consumers is null || consumers.Length == 0) { Console.WriteLine("No event consumers found."); return; }
 
-                if (fmt == OutputFormat.Json) { Formatter.PrintJson(consumers); return; }
+                if (fmt == OutputFormat.Json)
+                {
+                    Formatter.PrintJson(consumers, SymplrJsonContext.Default.EventConsumerResponseArray);
+                    return;
+                }
 
                 Formatter.PrintTable(
                     ["ID", "NAME", "ENDPOINT", "AUTH TYPE", "DISABLED"],
@@ -429,25 +526,32 @@ public static class TcmCommands
                         c.IsDisabled ? "yes" : "no",
                     }));
             });
-        }, envOption, output);
+        });
         return cmd;
     }
 
     private static Command BuildEventConsumersGetCommand(Option<SymplrEnvironment> envOption)
     {
-        var idArg = new Argument<Guid>("id", "Event Consumer ID (UUID)");
+        var idArg  = new Argument<Guid>("id") { Description = "Event Consumer ID (UUID)" };
         var output = OutputOption();
-        var cmd = new Command("get", "Get an event consumer by ID");
-        cmd.AddArgument(idArg);
-        cmd.AddOption(output);
-        cmd.SetHandler(async (env, id, fmt) =>
+        var cmd    = new Command("get", "Get an event consumer by ID");
+        cmd.Arguments.Add(idArg);
+        cmd.Options.Add(output);
+        cmd.SetAction(async (parseResult, ct) =>
         {
+            var env = parseResult.GetValue(envOption);
+            var id  = parseResult.GetValue(idArg);
+            var fmt = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var consumer = await client.GetEventConsumerAsync(id);
                 if (consumer is null) { Formatter.Error($"Event consumer {id} not found."); return; }
 
-                if (fmt == OutputFormat.Json) { Formatter.PrintJson(consumer); return; }
+                if (fmt == OutputFormat.Json)
+                {
+                    Formatter.PrintJson(consumer, SymplrJsonContext.Default.EventConsumerResponse);
+                    return;
+                }
 
                 Formatter.PrintTable(
                     ["FIELD", "VALUE"],
@@ -466,7 +570,7 @@ public static class TcmCommands
                         ["Modified By",  consumer.LastModifiedBy ?? ""],
                     ]);
             });
-        }, envOption, idArg, output);
+        });
         return cmd;
     }
 
@@ -475,16 +579,22 @@ public static class TcmCommands
     private static Command BuildEventTypesListCommand(Option<SymplrEnvironment> envOption)
     {
         var output = OutputOption();
-        var cmd = new Command("list", "List all event types");
-        cmd.AddOption(output);
-        cmd.SetHandler(async (env, fmt) =>
+        var cmd    = new Command("list", "List all event types");
+        cmd.Options.Add(output);
+        cmd.SetAction(async (parseResult, ct) =>
         {
+            var env = parseResult.GetValue(envOption);
+            var fmt = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var types = await client.GetEventTypesAsync();
                 if (types is null || types.Length == 0) { Console.WriteLine("No event types found."); return; }
 
-                if (fmt == OutputFormat.Json) { Formatter.PrintJson(types); return; }
+                if (fmt == OutputFormat.Json)
+                {
+                    Formatter.PrintJson(types, SymplrJsonContext.Default.EventTypeResponseArray);
+                    return;
+                }
 
                 Formatter.PrintTable(
                     ["ID", "NAME", "PRODUCT ID", "DISABLED"],
@@ -496,25 +606,32 @@ public static class TcmCommands
                         t.IsDisabled ? "yes" : "no",
                     }));
             });
-        }, envOption, output);
+        });
         return cmd;
     }
 
     private static Command BuildEventTypesGetCommand(Option<SymplrEnvironment> envOption)
     {
-        var idArg = new Argument<Guid>("id", "Event Type ID (UUID)");
+        var idArg  = new Argument<Guid>("id") { Description = "Event Type ID (UUID)" };
         var output = OutputOption();
-        var cmd = new Command("get", "Get an event type by ID");
-        cmd.AddArgument(idArg);
-        cmd.AddOption(output);
-        cmd.SetHandler(async (env, id, fmt) =>
+        var cmd    = new Command("get", "Get an event type by ID");
+        cmd.Arguments.Add(idArg);
+        cmd.Options.Add(output);
+        cmd.SetAction(async (parseResult, ct) =>
         {
+            var env = parseResult.GetValue(envOption);
+            var id  = parseResult.GetValue(idArg);
+            var fmt = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var et = await client.GetEventTypeAsync(id);
                 if (et is null) { Formatter.Error($"Event type {id} not found."); return; }
 
-                if (fmt == OutputFormat.Json) { Formatter.PrintJson(et); return; }
+                if (fmt == OutputFormat.Json)
+                {
+                    Formatter.PrintJson(et, SymplrJsonContext.Default.EventTypeResponse);
+                    return;
+                }
 
                 Formatter.PrintTable(
                     ["FIELD", "VALUE"],
@@ -530,7 +647,7 @@ public static class TcmCommands
                         ["Modified By", et.LastModifiedBy ?? ""],
                     ]);
             });
-        }, envOption, idArg, output);
+        });
         return cmd;
     }
 
@@ -539,16 +656,22 @@ public static class TcmCommands
     private static Command BuildEventTypeConsumersListCommand(Option<SymplrEnvironment> envOption)
     {
         var output = OutputOption();
-        var cmd = new Command("list", "List all event type consumer mappings");
-        cmd.AddOption(output);
-        cmd.SetHandler(async (env, fmt) =>
+        var cmd    = new Command("list", "List all event type consumer mappings");
+        cmd.Options.Add(output);
+        cmd.SetAction(async (parseResult, ct) =>
         {
+            var env = parseResult.GetValue(envOption);
+            var fmt = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var mappings = await client.GetEventTypeConsumersAsync();
                 if (mappings is null || mappings.Length == 0) { Console.WriteLine("No event type consumer mappings found."); return; }
 
-                if (fmt == OutputFormat.Json) { Formatter.PrintJson(mappings); return; }
+                if (fmt == OutputFormat.Json)
+                {
+                    Formatter.PrintJson(mappings, SymplrJsonContext.Default.EventTypeConsumerResponseArray);
+                    return;
+                }
 
                 Formatter.PrintTable(
                     ["ID", "EVENT TYPE", "CONSUMER", "TENANT", "PRODUCT", "ENVIRONMENT", "DISABLED"],
@@ -563,25 +686,32 @@ public static class TcmCommands
                         m.IsDisabled ? "yes" : "no",
                     }));
             });
-        }, envOption, output);
+        });
         return cmd;
     }
 
     private static Command BuildEventTypeConsumersGetCommand(Option<SymplrEnvironment> envOption)
     {
-        var idArg = new Argument<Guid>("id", "Event Type Consumer ID (UUID)");
+        var idArg  = new Argument<Guid>("id") { Description = "Event Type Consumer ID (UUID)" };
         var output = OutputOption();
-        var cmd = new Command("get", "Get an event type consumer mapping by ID");
-        cmd.AddArgument(idArg);
-        cmd.AddOption(output);
-        cmd.SetHandler(async (env, id, fmt) =>
+        var cmd    = new Command("get", "Get an event type consumer mapping by ID");
+        cmd.Arguments.Add(idArg);
+        cmd.Options.Add(output);
+        cmd.SetAction(async (parseResult, ct) =>
         {
+            var env = parseResult.GetValue(envOption);
+            var id  = parseResult.GetValue(idArg);
+            var fmt = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var m = await client.GetEventTypeConsumerAsync(id);
                 if (m is null) { Formatter.Error($"Event type consumer {id} not found."); return; }
 
-                if (fmt == OutputFormat.Json) { Formatter.PrintJson(m); return; }
+                if (fmt == OutputFormat.Json)
+                {
+                    Formatter.PrintJson(m, SymplrJsonContext.Default.EventTypeConsumerResponse);
+                    return;
+                }
 
                 Formatter.PrintTable(
                     ["FIELD", "VALUE"],
@@ -607,25 +737,32 @@ public static class TcmCommands
                         ["Modified By",                m.LastModifiedBy ?? ""],
                     ]);
             });
-        }, envOption, idArg, output);
+        });
         return cmd;
     }
 
     private static Command BuildEventTypeConsumersByConsumerCommand(Option<SymplrEnvironment> envOption)
     {
-        var idArg = new Argument<Guid>("consumer-id", "Event Consumer ID (UUID)");
+        var idArg  = new Argument<Guid>("consumer-id") { Description = "Event Consumer ID (UUID)" };
         var output = OutputOption();
-        var cmd = new Command("by-consumer", "List all event type mappings for a given event consumer");
-        cmd.AddArgument(idArg);
-        cmd.AddOption(output);
-        cmd.SetHandler(async (env, id, fmt) =>
+        var cmd    = new Command("by-consumer", "List all event type mappings for a given event consumer");
+        cmd.Arguments.Add(idArg);
+        cmd.Options.Add(output);
+        cmd.SetAction(async (parseResult, ct) =>
         {
+            var env = parseResult.GetValue(envOption);
+            var id  = parseResult.GetValue(idArg);
+            var fmt = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var mappings = await client.GetEventTypeConsumersByConsumerAsync(id);
                 if (mappings is null || mappings.Length == 0) { Console.WriteLine("No mappings found for event consumer."); return; }
 
-                if (fmt == OutputFormat.Json) { Formatter.PrintJson(mappings); return; }
+                if (fmt == OutputFormat.Json)
+                {
+                    Formatter.PrintJson(mappings, SymplrJsonContext.Default.EventTypeConsumerResponseArray);
+                    return;
+                }
 
                 Formatter.PrintTable(
                     ["ID", "EVENT TYPE", "TENANT", "PRODUCT", "ENVIRONMENT", "DISABLED"],
@@ -639,14 +776,18 @@ public static class TcmCommands
                         m.IsDisabled ? "yes" : "no",
                     }));
             });
-        }, envOption, idArg, output);
+        });
         return cmd;
     }
 
     // ─── helpers ──────────────────────────────────────────────────────────────
 
     private static Option<OutputFormat> OutputOption() =>
-        new("--output", () => OutputFormat.Table, "Output format: table or json");
+        new("--output")
+        {
+            Description = "Output format: table or json",
+            DefaultValueFactory = _ => OutputFormat.Table,
+        };
 
     private static async Task RunTcmAsync(SymplrEnvironment env, Func<TcmClient, Task> action)
     {
@@ -666,7 +807,7 @@ public static class TcmCommands
         }
 
         var baseUrl = ServiceUrlResolver.Resolve(env, ServiceKey, DefaultRoutePrefix, store);
-        var client = TcmClient.Create(baseUrl, token.AccessToken);
+        var client  = TcmClient.Create(baseUrl, token.AccessToken);
         try
         {
             await action(client);

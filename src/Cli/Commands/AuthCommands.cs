@@ -12,27 +12,30 @@ public static class AuthCommands
     public static Command Build(Option<SymplrEnvironment> envOption)
     {
         var auth = new Command("auth", "Authenticate with symplr Platform");
-        auth.AddCommand(BuildLogin(envOption));
-        auth.AddCommand(BuildToken(envOption));
-        auth.AddCommand(BuildLogout(envOption));
-        auth.AddCommand(BuildStatus());
-        auth.AddCommand(BuildSwitch());
+        auth.Subcommands.Add(BuildLogin(envOption));
+        auth.Subcommands.Add(BuildToken(envOption));
+        auth.Subcommands.Add(BuildLogout(envOption));
+        auth.Subcommands.Add(BuildStatus());
+        auth.Subcommands.Add(BuildSwitch());
         return auth;
     }
 
     // ── auth login ────────────────────────────────────────────────────────────
-    // Interactive device flow. --token skips the browser for users who already
-    // have a bearer token in hand.
 
     private static Command BuildLogin(Option<SymplrEnvironment> envOption)
     {
-        var tokenOption = new Option<string?>("--token", "Skip browser flow and store this Bearer token directly");
+        var tokenOption = new Option<string?>("--token")
+        {
+            Description = "Skip browser flow and store this Bearer token directly",
+        };
 
         var cmd = new Command("login", "Log in interactively via device flow (opens browser)");
-        cmd.AddOption(tokenOption);
-
-        cmd.SetHandler(async (env, rawToken) =>
+        cmd.Options.Add(tokenOption);
+        cmd.SetAction(async (parseResult, ct) =>
         {
+            var env      = parseResult.GetValue(envOption);
+            var rawToken = parseResult.GetValue(tokenOption);
+
             var store  = new TokenStore();
             var config = EnvironmentConfig.For(env);
 
@@ -55,7 +58,7 @@ public static class AuthCommands
                         Console.WriteLine($"Enter the code:       {userCode}");
                         Console.WriteLine("Waiting for authentication...");
                         OpenBrowser(verificationUri);
-                    });
+                    }, ct);
             }
             catch (InvalidOperationException ex)
             {
@@ -76,29 +79,40 @@ public static class AuthCommands
                 DateTimeOffset.UtcNow.AddSeconds(token.ExpiresIn)));
 
             Console.WriteLine($"Logged in to {env}.");
-        }, envOption, tokenOption);
+        });
         return cmd;
     }
 
     // ── auth token ────────────────────────────────────────────────────────────
-    // Non-interactive client credentials flow for service accounts / CI.
-    // Flags take priority; falls back to credentials stored via
-    // 'symplr config set client-id / client-secret'.
 
     private static Command BuildToken(Option<SymplrEnvironment> envOption)
     {
-        var clientIdOption = new Option<string?>("--client-id",     "OAuth client ID (overrides stored value)");
-        var secretOption   = new Option<string?>("--client-secret", "OAuth client secret (overrides stored value)");
-        var scopeOption    = new Option<string?>("--scope",         "OAuth scope (optional; server uses client defaults if omitted)");
+        var clientIdOption = new Option<string?>("--client-id")
+        {
+            Description = "OAuth client ID (overrides stored value)",
+        };
+        var secretOption = new Option<string?>("--client-secret")
+        {
+            Description = "OAuth client secret (overrides stored value)",
+        };
+        var scopeOption = new Option<string?>("--scope")
+        {
+            Description = "OAuth scope (optional; server uses client defaults if omitted)",
+        };
 
         var cmd = new Command("token", "Obtain a token via client credentials (non-interactive)");
-        cmd.AddOption(clientIdOption);
-        cmd.AddOption(secretOption);
-        cmd.AddOption(scopeOption);
+        cmd.Options.Add(clientIdOption);
+        cmd.Options.Add(secretOption);
+        cmd.Options.Add(scopeOption);
 
-        cmd.SetHandler(async (env, clientId, clientSecret, scope) =>
+        cmd.SetAction(async (parseResult, ct) =>
         {
-            var store = new TokenStore();
+            var env          = parseResult.GetValue(envOption);
+            var clientId     = parseResult.GetValue(clientIdOption);
+            var clientSecret = parseResult.GetValue(secretOption);
+            var scope        = parseResult.GetValue(scopeOption);
+
+            var store  = new TokenStore();
             var stored = store.GetClientCredential(env);
 
             var resolvedId     = clientId     ?? stored?.ClientId;
@@ -133,7 +147,7 @@ public static class AuthCommands
                 DateTimeOffset.UtcNow.AddSeconds(token.ExpiresIn)));
 
             Console.WriteLine($"Token stored for {env} (expires in {token.ExpiresIn}s).");
-        }, envOption, clientIdOption, secretOption, scopeOption);
+        });
         return cmd;
     }
 
@@ -142,8 +156,9 @@ public static class AuthCommands
     private static Command BuildLogout(Option<SymplrEnvironment> envOption)
     {
         var cmd = new Command("logout", "Log out and revoke the stored token");
-        cmd.SetHandler(async (env) =>
+        cmd.SetAction(async (parseResult, ct) =>
         {
+            var env   = parseResult.GetValue(envOption);
             var store = new TokenStore();
             var stored = store.Load(env);
             if (stored is null) { Console.WriteLine($"Not logged in to {env}."); return; }
@@ -154,7 +169,7 @@ public static class AuthCommands
 
             store.Remove(env);
             Console.WriteLine($"Logged out of {env}.");
-        }, envOption);
+        });
         return cmd;
     }
 
@@ -163,10 +178,10 @@ public static class AuthCommands
     private static Command BuildStatus()
     {
         var cmd = new Command("status", "Show current authentication state");
-        cmd.SetHandler(() =>
+        cmd.SetAction(parseResult =>
         {
-            var store = new TokenStore();
-            var all = store.All();
+            var store  = new TokenStore();
+            var all    = store.All();
             var active = store.ActiveEnvironment();
 
             if (all.Count == 0) { Console.WriteLine("Not logged in to any environment."); return; }
@@ -176,7 +191,7 @@ public static class AuthCommands
                 all.Select(kv =>
                 {
                     var expired = kv.Value.ExpiresAt < DateTimeOffset.UtcNow;
-                    var marker = kv.Key.Equals(active?.ToString(), StringComparison.OrdinalIgnoreCase) ? "*" : " ";
+                    var marker  = kv.Key.Equals(active?.ToString(), StringComparison.OrdinalIgnoreCase) ? "*" : " ";
                     return new[]
                     {
                         $"{marker} {kv.Key}",
@@ -192,11 +207,15 @@ public static class AuthCommands
 
     private static Command BuildSwitch()
     {
-        var envArg = new Argument<SymplrEnvironment>("environment", "Environment to switch to (dev, qa, stable, staging, production)");
-        var cmd = new Command("switch", "Switch the default environment");
-        cmd.AddArgument(envArg);
-        cmd.SetHandler((env) =>
+        var envArg = new Argument<SymplrEnvironment>("environment")
         {
+            Description = "Environment to switch to (dev, qa, stable, staging, production)",
+        };
+        var cmd = new Command("switch", "Switch the default environment");
+        cmd.Arguments.Add(envArg);
+        cmd.SetAction(parseResult =>
+        {
+            var env   = parseResult.GetValue(envArg);
             var store = new TokenStore();
             var token = store.Load(env);
 
@@ -207,7 +226,7 @@ public static class AuthCommands
 
             store.SetActive(env);
             Console.WriteLine($"Switched to {env}.");
-        }, envArg);
+        });
         return cmd;
     }
 

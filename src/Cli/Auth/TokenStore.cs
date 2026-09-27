@@ -7,6 +7,19 @@ namespace SymplrCli.Auth;
 public record StoredToken(string AccessToken, string? RefreshToken, DateTimeOffset ExpiresAt);
 public record StoredClientCredential(string ClientId, string ClientSecret);
 
+internal sealed class TokenStoreConfig
+{
+    public Dictionary<string, StoredToken> Sessions { get; set; } = [];
+    public string? ActiveEnvironment { get; set; }
+    public Dictionary<string, string> PlatformHosts { get; set; } = [];
+    public Dictionary<string, string> RoutePrefixes { get; set; } = [];
+    public Dictionary<string, StoredClientCredential> ClientCredentials { get; set; } = [];
+}
+
+[JsonSerializable(typeof(TokenStoreConfig))]
+[JsonSourceGenerationOptions(WriteIndented = true)]
+internal partial class TokenStoreConfigContext : JsonSerializerContext { }
+
 public class TokenStore
 {
     private static readonly string ConfigDir = Path.Combine(
@@ -14,21 +27,6 @@ public class TokenStore
         "symplr");
 
     private static string ConfigPath => Path.Combine(ConfigDir, "config.json");
-
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = true,
-        Converters = { new JsonStringEnumConverter() },
-    };
-
-    private sealed class Config
-    {
-        public Dictionary<string, StoredToken> Sessions { get; set; } = [];
-        public string? ActiveEnvironment { get; set; }
-        public Dictionary<string, string> PlatformHosts { get; set; } = [];
-        public Dictionary<string, string> RoutePrefixes { get; set; } = [];
-        public Dictionary<string, StoredClientCredential> ClientCredentials { get; set; } = [];
-    }
 
     public StoredToken? Load(SymplrEnvironment env)
     {
@@ -135,16 +133,23 @@ public class TokenStore
 
     private static string Key(SymplrEnvironment env) => env.ToString().ToLowerInvariant();
 
-    private Config ReadConfig()
+    private TokenStoreConfig ReadConfig()
     {
-        if (!File.Exists(ConfigPath)) return new Config();
-        try { return JsonSerializer.Deserialize<Config>(File.ReadAllText(ConfigPath), JsonOptions) ?? new Config(); }
-        catch { return new Config(); }
+        if (!File.Exists(ConfigPath)) return new TokenStoreConfig();
+        try
+        {
+            return JsonSerializer.Deserialize(
+                File.ReadAllText(ConfigPath),
+                TokenStoreConfigContext.Default.TokenStoreConfig) ?? new TokenStoreConfig();
+        }
+        catch { return new TokenStoreConfig(); }
     }
 
-    private void WriteConfig(Config config)
+    private void WriteConfig(TokenStoreConfig config)
     {
         Directory.CreateDirectory(ConfigDir);
-        File.WriteAllText(ConfigPath, JsonSerializer.Serialize(config, JsonOptions));
+        File.WriteAllText(ConfigPath, JsonSerializer.Serialize(
+            config,
+            TokenStoreConfigContext.Default.TokenStoreConfig));
     }
 }

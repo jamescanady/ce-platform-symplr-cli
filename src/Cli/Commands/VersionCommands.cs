@@ -21,17 +21,27 @@ public static class VersionCommands
         string serviceKey,
         string defaultRoutePrefix)
     {
-        var output = new Option<OutputFormat>("--output", () => OutputFormat.Table, "Output format: table or json");
-        var cmd = new Command("version", "Show the deployed version of this service");
-        cmd.AddOption(output);
-        cmd.SetHandler(async (env, fmt) =>
+        var output = new Option<OutputFormat>("--output")
         {
+            Description = "Output format: table or json",
+            DefaultValueFactory = _ => OutputFormat.Table,
+        };
+        var cmd = new Command("version", "Show the deployed version of this service");
+        cmd.Options.Add(output);
+        cmd.SetAction(async (parseResult, ct) =>
+        {
+            var env = parseResult.GetValue(envOption);
+            var fmt = parseResult.GetValue(output);
+
             var baseUrl = ServiceUrlResolver.Resolve(env, serviceKey, defaultRoutePrefix, new TokenStore());
             using var http = new HttpClient();
             ServiceVersionResponse? v;
             try
             {
-                v = await http.GetFromJsonAsync<ServiceVersionResponse>($"{baseUrl}/version");
+                v = await http.GetFromJsonAsync(
+                    $"{baseUrl}/version",
+                    SymplrJsonContext.Default.ServiceVersionResponse,
+                    ct);
             }
             catch (HttpRequestException ex)
             {
@@ -41,7 +51,11 @@ public static class VersionCommands
 
             if (v is null) { Formatter.Error("No version information returned."); return; }
 
-            if (fmt == OutputFormat.Json) { Formatter.PrintJson(v); return; }
+            if (fmt == OutputFormat.Json)
+            {
+                Formatter.PrintJson(v, SymplrJsonContext.Default.ServiceVersionResponse);
+                return;
+            }
 
             Formatter.PrintTable(
                 ["FIELD", "VALUE"],
@@ -53,7 +67,7 @@ public static class VersionCommands
                     ["Minor",       v.Minor.ToString()],
                     ["Build",       v.Build.ToString()],
                 ]);
-        }, envOption, output);
+        });
         return cmd;
     }
 }

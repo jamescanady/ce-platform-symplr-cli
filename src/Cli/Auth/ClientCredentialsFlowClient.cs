@@ -22,6 +22,6 @@ public class ClientCredentialsFlowClient(HttpClient http)
 
         var response = await http.PostAsync(env.TokenEndpoint, new FormUrlEncodedContent(fields));
         response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<TokenResponse>())!;
+        return (await response.Content.ReadFromJsonAsync(SymplrJsonContext.Default.TokenResponse))!;
     }
 }

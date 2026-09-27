@@ -4,6 +4,11 @@ using SymplrCli.Platform;
 
 namespace SymplrCli.Auth;
 
+public record TokenResponse(
+    [property: JsonPropertyName("access_token")]  string AccessToken,
+    [property: JsonPropertyName("refresh_token")] string? RefreshToken,
+    [property: JsonPropertyName("expires_in")]    int ExpiresIn);
+
 public record DeviceAuthResponse(
     [property: JsonPropertyName("device_code")]               string DeviceCode,
     [property: JsonPropertyName("user_code")]                 string UserCode,
@@ -11,6 +16,8 @@ public record DeviceAuthResponse(
     [property: JsonPropertyName("verification_uri_complete")] string? VerificationUriComplete,
     [property: JsonPropertyName("expires_in")]                int ExpiresIn,
     [property: JsonPropertyName("interval")]                  int Interval);
+
+internal record DeviceFlowError([property: JsonPropertyName("error")] string? Error);
 
 public class DeviceFlowClient(HttpClient http)
 {
@@ -45,7 +52,8 @@ public class DeviceFlowClient(HttpClient http)
         ]);
         var response = await http.PostAsync(env.DeviceAuthEndpoint, form, ct);
         response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<DeviceAuthResponse>(cancellationToken: ct))!;
+        return (await response.Content.ReadFromJsonAsync(
+            SymplrJsonContext.Default.DeviceAuthResponse, ct))!;
     }
 
     private async Task<TokenResponse?> PollForTokenAsync(
@@ -67,7 +75,8 @@ public class DeviceFlowClient(HttpClient http)
             var response = await http.PostAsync(env.TokenEndpoint, form, ct);
 
             if (response.IsSuccessStatusCode)
-                return await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken: ct);
+                return await response.Content.ReadFromJsonAsync(
+                    SymplrJsonContext.Default.TokenResponse, ct);
 
             var error = await ParseErrorAsync(response);
             switch (error)
@@ -90,11 +99,9 @@ public class DeviceFlowClient(HttpClient http)
     {
         try
         {
-            var body = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+            var body = await response.Content.ReadFromJsonAsync(SymplrJsonContext.Default.DeviceFlowError);
             return body?.Error ?? "unknown_error";
         }
         catch { return "unknown_error"; }
     }
-
-    private record ErrorResponse([property: JsonPropertyName("error")] string? Error);
 }

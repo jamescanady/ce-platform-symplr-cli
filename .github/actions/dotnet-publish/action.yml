@@ -1,5 +1,5 @@
 name: .NET Publish
-description: Publish a self-contained binary for a target RID, package it, and upload as a workflow artifact
+description: Publish a native AOT binary for a target RID, package it, and upload as a workflow artifact
 
 inputs:
   rid:
@@ -15,6 +15,11 @@ runs:
     - uses: actions/setup-dotnet@v6.0.0
       with:
         dotnet-version: '10.x'
+
+    - name: Install native AOT prerequisites (Linux)
+      if: ${{ runner.os == 'Linux' }}
+      shell: bash
+      run: sudo apt-get install -y clang zlib1g-dev
 
     - name: Publish
       shell: bash

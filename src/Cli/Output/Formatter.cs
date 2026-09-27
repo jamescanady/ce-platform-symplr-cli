@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 namespace SymplrCli.Output;
 
@@ -6,20 +7,6 @@ public enum OutputFormat { Table, Json }
 
 public static class Formatter
 {
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
-
-    public static void Print<T>(T data, OutputFormat format)
-    {
-        if (format == OutputFormat.Json)
-        {
-            Console.WriteLine(JsonSerializer.Serialize(data, JsonOptions));
-            return;
-        }
-
-        if (data is IEnumerable<string[]> rows)
-            PrintTable([], rows);
-    }
-
     public static void PrintTable(string[] headers, IEnumerable<string[]> rows)
     {
         var allRows = rows.ToList();
@@ -49,8 +36,8 @@ public static class Formatter
         Console.WriteLine(string.Join("  ", parts).TrimEnd());
     }
 
-    public static void PrintJson<T>(T data) =>
-        Console.WriteLine(JsonSerializer.Serialize(data, JsonOptions));
+    public static void PrintJson<T>(T data, JsonTypeInfo<T> typeInfo) =>
+        Console.WriteLine(JsonSerializer.Serialize(data, typeInfo));
 
     public static void Error(string message)
     {

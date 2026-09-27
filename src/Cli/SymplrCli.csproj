@@ -8,10 +8,12 @@
     <AssemblyName>symplr</AssemblyName>
     <RootNamespace>SymplrCli</RootNamespace>
     <IsPackable>false</IsPackable>
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+    <PackageReference Include="System.CommandLine" Version="2.0.12" />
   </ItemGroup>
 
 </Project>

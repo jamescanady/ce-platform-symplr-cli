@@ -16,14 +16,23 @@ jobs:
         id: version
         run: echo "value=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
 
-  # Cross-compile for all target platforms on a single Ubuntu runner.
+  # Cross-compile for all target platforms, each on its native runner.
+  # Native AOT requires the host toolchain to match the target platform.
   publish:
     name: Publish (${{ matrix.rid }})
     needs: prepare
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        rid: [win-x64, linux-x64, osx-x64, osx-arm64]
+        include:
+          - rid: win-x64
+            os: windows-latest
+          - rid: linux-x64
+            os: ubuntu-latest
+          - rid: osx-x64
+            os: macos-latest
+          - rid: osx-arm64
+            os: macos-latest
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: ./.github/actions/dotnet-publish

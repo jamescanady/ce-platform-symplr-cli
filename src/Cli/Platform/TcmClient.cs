@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 namespace SymplrCli.Platform;
 
@@ -72,8 +72,8 @@ public record EventConsumerResponse(
     string? Description,
     string Endpoint,
     string? AuthorizationType,
-    JsonElement? AuthorizationParameters,
-    JsonElement? InvocationHttpParameters,
+    object? AuthorizationParameters,
+    object? InvocationHttpParameters,
     bool IsDisabled,
     string? CreatedBy,
     DateTimeOffset Created,
@@ -130,46 +130,46 @@ public class TcmClient
     }
 
     public Task<TenantResponse[]?> GetTenantsAsync(bool withProducts = false) =>
-        GetAsync<TenantResponse[]>($"v1/Tenant?withProducts={withProducts}");
+        GetAsync($"v1/Tenant?withProducts={withProducts}", SymplrJsonContext.Default.TenantResponseArray);
 
     public async Task<TenantResponse?> GetTenantAsync(Guid id, bool withProducts = false)
     {
         var response = await _http.GetAsync($"v1/Tenant/{id}?withProducts={withProducts}");
         if (response.StatusCode == HttpStatusCode.NotFound) return null;
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<TenantResponse>();
+        return await response.Content.ReadFromJsonAsync(SymplrJsonContext.Default.TenantResponse);
     }
 
     public Task<TenantResponse[]?> FindTenantsAsync(string needle) =>
-        GetAsync<TenantResponse[]>($"v1/Tenant/find/{Uri.EscapeDataString(needle)}");
+        GetAsync($"v1/Tenant/find/{Uri.EscapeDataString(needle)}", SymplrJsonContext.Default.TenantResponseArray);
 
     public Task<TenantNamespaceResponse[]?> GetTenantNamespacesAsync(Guid tenantId) =>
-        GetAsync<TenantNamespaceResponse[]>($"v1/Tenant/{tenantId}/productEnvironmentsByNamespace");
+        GetAsync($"v1/Tenant/{tenantId}/productEnvironmentsByNamespace", SymplrJsonContext.Default.TenantNamespaceResponseArray);
 
     public Task<NamespaceResponse[]?> GetNamespacesAsync(bool includeInactive = false) =>
-        GetAsync<NamespaceResponse[]>($"v1/Namespace?includeInactive={includeInactive}");
+        GetAsync($"v1/Namespace?includeInactive={includeInactive}", SymplrJsonContext.Default.NamespaceResponseArray);
 
     public async Task<NamespaceResponse?> GetNamespaceAsync(Guid id)
     {
         var response = await _http.GetAsync($"v1/Namespace/{id}");
         if (response.StatusCode == HttpStatusCode.NotFound) return null;
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<NamespaceResponse>();
+        return await response.Content.ReadFromJsonAsync(SymplrJsonContext.Default.NamespaceResponse);
     }
 
     public Task<ProductResponse[]?> GetProductsAsync() =>
-        GetAsync<ProductResponse[]>("v1/Product");
+        GetAsync("v1/Product", SymplrJsonContext.Default.ProductResponseArray);
 
     public async Task<ProductResponse?> GetProductAsync(Guid id)
     {
         var response = await _http.GetAsync($"v1/Product/{id}");
         if (response.StatusCode == HttpStatusCode.NotFound) return null;
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<ProductResponse>();
+        return await response.Content.ReadFromJsonAsync(SymplrJsonContext.Default.ProductResponse);
     }
 
     public Task<ProductResponse[]?> FindProductsAsync(string needle) =>
-        GetAsync<ProductResponse[]>($"v1/Product/find/{Uri.EscapeDataString(needle)}");
+        GetAsync($"v1/Product/find/{Uri.EscapeDataString(needle)}", SymplrJsonContext.Default.ProductResponseArray);
 
     public Task<TenantByProductResponse[]?> GetTenantsByProductAsync(Guid id, string? tenantFilter = null, string? namespaceName = null)
     {
@@ -177,52 +177,52 @@ public class TcmClient
         if (tenantFilter is not null) qs.Add($"tenantFilter={Uri.EscapeDataString(tenantFilter)}");
         if (namespaceName is not null) qs.Add($"namespaceName={Uri.EscapeDataString(namespaceName)}");
         var query = qs.Count > 0 ? "?" + string.Join("&", qs) : "";
-        return GetAsync<TenantByProductResponse[]>($"v1/Product/{id}/Tenant{query}");
+        return GetAsync($"v1/Product/{id}/Tenant{query}", SymplrJsonContext.Default.TenantByProductResponseArray);
     }
 
     public Task<ProductEnvironmentResponse[]?> GetProductEnvironmentsAsync(Guid productId) =>
-        GetAsync<ProductEnvironmentResponse[]>($"v1/ProductEnvironment/Product/{productId}");
+        GetAsync($"v1/ProductEnvironment/Product/{productId}", SymplrJsonContext.Default.ProductEnvironmentResponseArray);
 
     public Task<EventConsumerResponse[]?> GetEventConsumersAsync() =>
-        GetAsync<EventConsumerResponse[]>("v1/EventConsumer");
+        GetAsync("v1/EventConsumer", SymplrJsonContext.Default.EventConsumerResponseArray);
 
     public async Task<EventConsumerResponse?> GetEventConsumerAsync(Guid id)
     {
         var response = await _http.GetAsync($"v1/EventConsumer/{id}");
         if (response.StatusCode == HttpStatusCode.NotFound) return null;
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<EventConsumerResponse>();
+        return await response.Content.ReadFromJsonAsync(SymplrJsonContext.Default.EventConsumerResponse);
     }
 
     public Task<EventTypeResponse[]?> GetEventTypesAsync() =>
-        GetAsync<EventTypeResponse[]>("v1/EventType");
+        GetAsync("v1/EventType", SymplrJsonContext.Default.EventTypeResponseArray);
 
     public async Task<EventTypeResponse?> GetEventTypeAsync(Guid id)
     {
         var response = await _http.GetAsync($"v1/EventType/{id}");
         if (response.StatusCode == HttpStatusCode.NotFound) return null;
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<EventTypeResponse>();
+        return await response.Content.ReadFromJsonAsync(SymplrJsonContext.Default.EventTypeResponse);
     }
 
     public Task<EventTypeConsumerResponse[]?> GetEventTypeConsumersAsync() =>
-        GetAsync<EventTypeConsumerResponse[]>("v1/EventTypeConsumer");
+        GetAsync("v1/EventTypeConsumer", SymplrJsonContext.Default.EventTypeConsumerResponseArray);
 
     public async Task<EventTypeConsumerResponse?> GetEventTypeConsumerAsync(Guid id)
     {
         var response = await _http.GetAsync($"v1/EventTypeConsumer/{id}");
         if (response.StatusCode == HttpStatusCode.NotFound) return null;
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<EventTypeConsumerResponse>();
+        return await response.Content.ReadFromJsonAsync(SymplrJsonContext.Default.EventTypeConsumerResponse);
     }
 
     public Task<EventTypeConsumerResponse[]?> GetEventTypeConsumersByConsumerAsync(Guid consumerId) =>
-        GetAsync<EventTypeConsumerResponse[]>($"v1/EventTypeConsumer/eventConsumer/{consumerId}");
+        GetAsync($"v1/EventTypeConsumer/eventConsumer/{consumerId}", SymplrJsonContext.Default.EventTypeConsumerResponseArray);
 
-    private async Task<T?> GetAsync<T>(string path)
+    private async Task<T?> GetAsync<T>(string path, JsonTypeInfo<T> typeInfo)
     {
         var response = await _http.GetAsync(path);
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<T>();
+        return await response.Content.ReadFromJsonAsync(typeInfo);
     }
 }
