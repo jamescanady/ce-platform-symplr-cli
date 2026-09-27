@@ -8,6 +8,9 @@ namespace SymplrCli.Commands;
 
 public static class TcmCommands
 {
+    internal const string ServiceKey = "tcm";
+    internal const string DefaultRoutePrefix = "ce-platform-tenant-configuration-service";
+
     public static Command Build(Option<SymplrEnvironment> envOption)
     {
         var tcm = new Command("tcm", "Tenant Configuration Management");
@@ -48,6 +51,7 @@ public static class TcmCommands
         tcm.AddCommand(eventConsumers);
         tcm.AddCommand(eventTypes);
         tcm.AddCommand(eventTypeConsumers);
+        tcm.AddCommand(VersionCommands.BuildSubCommand(envOption, ServiceKey, DefaultRoutePrefix));
         return tcm;
     }
 
@@ -661,7 +665,8 @@ public static class TcmCommands
             return;
         }
 
-        var client = TcmClient.Create(EnvironmentConfig.For(env), token.AccessToken);
+        var baseUrl = ServiceUrlResolver.Resolve(env, ServiceKey, DefaultRoutePrefix, store);
+        var client = TcmClient.Create(baseUrl, token.AccessToken);
         try
         {
             await action(client);

@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+jobs:
+  # Extract the version once; all downstream jobs reference this output.
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+    steps:
+      - name: Extract version
+        id: version
+        run: echo "value=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+  # Cross-compile for all target platforms on a single Ubuntu runner.
+  publish:
+    name: Publish (${{ matrix.rid }})
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rid: [win-x64, linux-x64, osx-x64, osx-arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/dotnet-publish
+        with:
+          rid: ${{ matrix.rid }}
+          version: ${{ needs.prepare.outputs.version }}
+
+  # Build release notes and create the GitHub release with all platform artifacts.
+  release:
+    name: Release
+    needs: [prepare, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build changelog
+        id: changelog
+        uses: mikepenz/release-changelog-builder-action@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          merge-multiple: true
+
+      - name: Create release
+        uses: mikepenz/action-gh-release@v1
+        with:
+          name: v${{ needs.prepare.outputs.version }}
+          body: ${{ steps.changelog.outputs.changelog }}
+          files: dist/*
+          token: ${{ secrets.GITHUB_TOKEN }}

@@ -24,6 +24,8 @@ public class TokenStore
     {
         public Dictionary<string, StoredToken> Sessions { get; set; } = [];
         public string? ActiveEnvironment { get; set; }
+        public Dictionary<string, string> PlatformHosts { get; set; } = [];
+        public Dictionary<string, string> RoutePrefixes { get; set; } = [];
     }
 
     public StoredToken? Load(SymplrEnvironment env)
@@ -64,6 +66,48 @@ public class TokenStore
     }
 
     public IReadOnlyDictionary<string, StoredToken> All() => ReadConfig().Sessions;
+
+    // ─── platform host overrides ──────────────────────────────────────────────
+
+    public string? GetPlatformHost(SymplrEnvironment env) =>
+        ReadConfig().PlatformHosts.TryGetValue(Key(env), out var h) ? h : null;
+
+    public void SetPlatformHost(SymplrEnvironment env, string host)
+    {
+        var config = ReadConfig();
+        config.PlatformHosts[Key(env)] = host;
+        WriteConfig(config);
+    }
+
+    public void UnsetPlatformHost(SymplrEnvironment env)
+    {
+        var config = ReadConfig();
+        config.PlatformHosts.Remove(Key(env));
+        WriteConfig(config);
+    }
+
+    public IReadOnlyDictionary<string, string> AllPlatformHosts() => ReadConfig().PlatformHosts;
+
+    // ─── route prefix overrides ───────────────────────────────────────────────
+
+    public string? GetRoutePrefix(string serviceKey) =>
+        ReadConfig().RoutePrefixes.TryGetValue(serviceKey, out var p) ? p : null;
+
+    public void SetRoutePrefix(string serviceKey, string prefix)
+    {
+        var config = ReadConfig();
+        config.RoutePrefixes[serviceKey] = prefix;
+        WriteConfig(config);
+    }
+
+    public void UnsetRoutePrefix(string serviceKey)
+    {
+        var config = ReadConfig();
+        config.RoutePrefixes.Remove(serviceKey);
+        WriteConfig(config);
+    }
+
+    public IReadOnlyDictionary<string, string> AllRoutePrefixes() => ReadConfig().RoutePrefixes;
 
     private static string Key(SymplrEnvironment env) => env.ToString().ToLowerInvariant();
 

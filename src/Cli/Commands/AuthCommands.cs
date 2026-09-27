@@ -36,19 +36,19 @@ public static class AuthCommands
             }
 
             var config = EnvironmentConfig.For(env);
-            var flow = new PkceFlowClient(new HttpClient());
+            var flow = new DeviceFlowClient(new HttpClient());
 
             Console.WriteLine($"Logging in to symplr Platform ({env})...");
 
             TokenResponse? token;
             try
             {
-                token = await flow.LoginAsync(config, authUrl =>
+                token = await flow.LoginAsync(config, (userCode, verificationUri) =>
                 {
-                    Console.WriteLine("Opening your browser for authentication.");
-                    Console.WriteLine($"If it does not open automatically, visit:");
-                    Console.WriteLine($"  {authUrl}");
-                    OpenBrowser(authUrl);
+                    Console.WriteLine($"Open your browser to: {verificationUri}");
+                    Console.WriteLine($"Enter the code:       {userCode}");
+                    Console.WriteLine("Waiting for authentication...");
+                    OpenBrowser(verificationUri);
                 });
             }
             catch (InvalidOperationException ex)
@@ -84,7 +84,7 @@ public static class AuthCommands
             if (stored is null) { Console.WriteLine($"Not logged in to {env}."); return; }
 
             var config = EnvironmentConfig.For(env);
-            var flow = new PkceFlowClient(new HttpClient());
+            var flow = new DeviceFlowClient(new HttpClient());
             try { await flow.RevokeAsync(config, stored.AccessToken); }
             catch { /* best-effort revocation */ }
 

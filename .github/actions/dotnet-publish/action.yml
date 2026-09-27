@@ -1,0 +1,45 @@
+name: .NET Publish
+description: Publish a self-contained binary for a target RID, package it, and upload as a workflow artifact
+
+inputs:
+  rid:
+    description: Target runtime identifier (win-x64 | linux-x64 | osx-x64 | osx-arm64)
+    required: true
+  version:
+    description: Version string without the v prefix (e.g. 1.2.3)
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.x'
+
+    - name: Publish
+      shell: bash
+      run: |
+        dotnet publish src/Cli \
+          -r ${{ inputs.rid }} \
+          -c Release \
+          --self-contained \
+          -o dist/${{ inputs.rid }} \
+          /p:Version=${{ inputs.version }}
+
+    - name: Package
+      shell: bash
+      run: |
+        RID="${{ inputs.rid }}"
+        VERSION="${{ inputs.version }}"
+        if [[ "$RID" == win-* ]]; then
+          zip -j "symplr-${VERSION}-${RID}.zip" "dist/${RID}/symplr.exe"
+        else
+          tar czf "symplr-${VERSION}-${RID}.tar.gz" -C "dist/${RID}" symplr
+        fi
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: symplr-${{ inputs.rid }}
+        path: symplr-${{ inputs.version }}-${{ inputs.rid }}.*
+        if-no-files-found: error

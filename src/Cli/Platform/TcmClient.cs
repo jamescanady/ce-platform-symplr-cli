@@ -120,11 +120,11 @@ public class TcmClient
 
     private TcmClient(HttpClient http) => _http = http;
 
-    public static TcmClient Create(EnvironmentConfig env, string accessToken)
+    // BaseAddress must end with '/' and relative paths must not start with '/'
+    // so that the path segment is appended, not replaced.
+    public static TcmClient Create(string baseUrl, string accessToken)
     {
-        // BaseAddress must end with '/' and relative paths must not start with '/'
-        // so that the path segment is appended, not replaced.
-        var http = new HttpClient { BaseAddress = new Uri(env.TcmBaseUrl.TrimEnd('/') + "/") };
+        var http = new HttpClient { BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/") };
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         return new TcmClient(http);
     }

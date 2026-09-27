@@ -118,7 +118,7 @@ symplr auth status
 
 ### `symplr config`
 
-Displays the resolved configuration: config file path, `SYMPLR_ENVIRONMENT` value, default environment with source, and all stored sessions.
+Displays the resolved configuration: config file path, `SYMPLR_ENVIRONMENT` value, default environment with source, any active URL overrides, and all stored sessions.
 
 ```
 symplr config [--env <env>]
@@ -126,9 +126,102 @@ symplr config [--env <env>]
 
 ---
 
+### Service URL overrides
+
+Platform service URLs are built from two parts:
+
+```
+https://<platform-host>/<route-prefix>
+```
+
+| Part | Default | Example |
+|------|---------|---------|
+| Platform host | `{env}-platform.symplr.com` | `stable-platform.symplr.com` |
+| Route prefix | Service-defined constant | `ce-platform-tenant-configuration-service` |
+
+Production is the exception — its platform host is `platform.symplr.com` (no environment prefix).
+
+Both parts can be overridden per-environment (host) or per-service (prefix) and are stored in `config.json`.
+
+#### `symplr config set platform-host <host>`
+
+Override the platform hostname for an environment. Affects all services in that environment.
+
+```
+symplr config set platform-host <host> [--env <env>]
+```
+
+| Argument | Description |
+|----------|-------------|
+| `host` | Hostname to use (e.g. `my-stable.example.com`) |
+
+```bash
+symplr config set platform-host my-stable.example.com --env stable
+symplr config set platform-host localhost:8080 --env dev
+```
+
+#### `symplr config set route-prefix <service> <prefix>`
+
+Override the route prefix for a specific service. Applies across all environments.
+
+```
+symplr config set route-prefix <service> <prefix>
+```
+
+| Argument | Description |
+|----------|-------------|
+| `service` | Service key (e.g. `tcm`) |
+| `prefix` | Route prefix to use (e.g. `my-tcm-route`) |
+
+```bash
+symplr config set route-prefix tcm my-tenant-config-service
+```
+
+#### `symplr config unset platform-host`
+
+Remove the platform hostname override for an environment, restoring the default.
+
+```
+symplr config unset platform-host [--env <env>]
+```
+
+```bash
+symplr config unset platform-host --env stable
+```
+
+#### `symplr config unset route-prefix <service>`
+
+Remove the route prefix override for a service, restoring the default.
+
+```
+symplr config unset route-prefix <service>
+```
+
+```bash
+symplr config unset route-prefix tcm
+```
+
+---
+
 ## Tenant Configuration Management (TCM)
 
 All `tcm` subcommands require an active, non-expired token for the target environment. All support `--output table|json` (default: `table`).
+
+### `symplr tcm version`
+
+Show the deployed version of the TCM service. Does not require authentication.
+
+```
+symplr tcm version [--output table|json] [--env <env>]
+```
+
+```bash
+symplr tcm version
+symplr tcm version --env production
+symplr tcm version --output json
+```
+
+---
 
 ### Tenants
 

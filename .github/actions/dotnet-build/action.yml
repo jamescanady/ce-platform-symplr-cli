@@ -1,0 +1,22 @@
+name: .NET Build
+description: Set up .NET 10, restore dependencies, and build the CLI project
+
+inputs:
+  configuration:
+    description: Build configuration
+    default: Release
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.x'
+
+    - name: Restore
+      shell: bash
+      run: dotnet restore src/Cli
+
+    - name: Build
+      shell: bash
+      run: dotnet build src/Cli --no-restore -c ${{ inputs.configuration }}
