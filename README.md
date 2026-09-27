@@ -47,22 +47,54 @@ git push origin :refs/tags/v1.2.3
 
 ## Installation
 
-Build a self-contained single-file executable:
+### Linux and macOS
+
+The `install.sh` script detects your OS and architecture, downloads the correct binary from the latest (or a pinned) release, and installs it to `/usr/local/bin`. Run it directly or pipe it to `bash` — both forms are equivalent:
 
 ```bash
-# Windows
-dotnet publish src/Cli -r win-x64 -c Release --self-contained -o dist/win
+# Latest release — download and run
+curl -fsSL https://raw.githubusercontent.com/jamescanady/ce-platform-symplr-cli/main/install.sh | bash
 
-# Linux
-dotnet publish src/Cli -r linux-x64 -c Release --self-contained -o dist/linux
+# Latest release — pipe directly to bash (no intermediate file)
+curl -fsSL https://raw.githubusercontent.com/jamescanady/ce-platform-symplr-cli/main/install.sh | bash
+
+# Specific version
+curl -fsSL https://raw.githubusercontent.com/jamescanady/ce-platform-symplr-cli/main/install.sh | bash -s v1.2.3
 ```
 
-Add the output directory to your `PATH`, then run `symplr`.
-
-During development:
+Or download the script first if you want to inspect it before running:
 
 ```bash
+curl -fsSLO https://raw.githubusercontent.com/jamescanady/ce-platform-symplr-cli/main/install.sh
+chmod +x install.sh
+./install.sh           # latest
+./install.sh v1.2.3    # specific version
+```
+
+`sudo` is invoked automatically if the script is not already running as root.
+
+**Supported platforms:** `linux-x64`, `osx-x64`, `osx-arm64`
+
+---
+
+### Windows
+
+Download `symplr-<version>-win-x64.zip` from the [releases page](https://github.com/jamescanady/ce-platform-symplr-cli/releases), extract `symplr.exe`, and place it anywhere on your `PATH`.
+
+---
+
+### Build from source
+
+Requires [.NET 10 SDK](https://dotnet.microsoft.com/download).
+
+```bash
+# Run without installing
 dotnet run --project src/Cli -- <command> [options]
+
+# Build a self-contained binary
+dotnet publish src/Cli -r win-x64   -c Release --self-contained -o dist/win
+dotnet publish src/Cli -r linux-x64 -c Release --self-contained -o dist/linux
+dotnet publish src/Cli -r osx-arm64 -c Release --self-contained -o dist/osx-arm64
 ```
 
 ## Environments
