@@ -2,6 +2,49 @@
 
 A cross-platform CLI for querying symplr Platform services.
 
+## Creating a release
+
+Releases are driven by a git tag. Pushing a tag triggers the release workflow, which builds binaries for all platforms, generates release notes from merged PRs, and publishes a GitHub release.
+
+**Prerequisites:** the tag must follow [semver](https://semver.org/) with a `v` prefix — e.g. `v1.2.3`.
+
+```bash
+# Make sure main is up to date
+git checkout main
+git pull
+
+# Tag the commit
+git tag v1.2.3
+
+# Push the tag — this is what triggers the release workflow
+git push origin v1.2.3
+```
+
+The workflow (`release.yml`) then:
+1. Extracts the version from the tag (`v1.2.3` → `1.2.3`)
+2. Cross-compiles a self-contained binary for each platform in parallel
+3. Packages each binary (`symplr-1.2.3-<rid>.zip` / `.tar.gz`)
+4. Builds release notes from PRs merged since the previous tag
+5. Creates a GitHub release with all four archives attached
+
+**Platform artifacts produced:**
+
+| File | Platform |
+|------|----------|
+| `symplr-<version>-win-x64.zip` | Windows x64 |
+| `symplr-<version>-linux-x64.tar.gz` | Linux x64 |
+| `symplr-<version>-osx-x64.tar.gz` | macOS Intel |
+| `symplr-<version>-osx-arm64.tar.gz` | macOS Apple Silicon |
+
+To delete a tag locally and remotely (e.g. to retag after a mistake):
+
+```bash
+git tag -d v1.2.3
+git push origin :refs/tags/v1.2.3
+```
+
+---
+
 ## Installation
 
 Build a self-contained single-file executable:
