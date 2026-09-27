@@ -47,6 +47,9 @@ jobs:
       - name: Build changelog
         id: changelog
         uses: mikepenz/release-changelog-builder-action@v6.3.0
+        with:
+          mode: COMMIT
+          toTag: ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
