@@ -11,6 +11,7 @@ namespace SymplrCli;
 [JsonSerializable(typeof(NamespaceResponse[]))]
 [JsonSerializable(typeof(NamespaceResponse))]
 [JsonSerializable(typeof(TenantNamespaceResponse[]))]
+[JsonSerializable(typeof(TenantNamespaceResponse))]
 [JsonSerializable(typeof(ProductResponse[]))]
 [JsonSerializable(typeof(ProductResponse))]
 [JsonSerializable(typeof(TenantByProductResponse[]))]
