@@ -5,117 +5,6 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace SymplrCli.Platform;
 
-public record TenantResponse(
-    Guid? Id,
-    string Name,
-    string Description,
-    string GlobalTenantCode,
-    string TenantShortCode,
-    bool IsDisabled,
-    TenantProductResponse[]? Products);
-
-public record TenantProductResponse(Guid? Id, string Name, string Description, bool IsDisabled);
-
-public record NamespaceResponse(
-    Guid Id,
-    string? Name,
-    string? ShortCode,
-    string? Description,
-    bool IsDefault,
-    bool IsDisabled,
-    DateTimeOffset CreatedDate,
-    string? CreatedBy,
-    DateTimeOffset LastModified,
-    string? LastModifiedBy);
-
-public record TenantNamespaceResponse(
-    Guid TenantId,
-    string? TenantName,
-    string? TenantDescription,
-    string? TenantShortCode,
-    TenantNamespaceItem[]? Namespaces);
-
-public record TenantNamespaceItem(
-    Guid NamespaceId,
-    string? Namespace,
-    string? NamespaceDescription,
-    NamespaceProductItem[]? Products);
-
-public record NamespaceProductItem(
-    Guid ProductId,
-    string? ProductName,
-    string? ProductDescription,
-    string? EnvironmentName,
-    Guid ProductEnvironmentId,
-    Guid TenantProductEnvironmentId);
-
-public record ProductResponse(Guid? Id, string Name, string Description, bool IsDisabled);
-
-public record TenantByProductResponse(
-    Guid Id,
-    string? Name,
-    string? Description,
-    string? TenantGlobalId,
-    string? TenantShortCode,
-    string? TenantProductCode,
-    Guid? NamespaceId,
-    string? NameSpace,
-    Guid ProductId,
-    string? ProductName,
-    string? EnvironmentName);
-
-public record ProductEnvironmentResponse(Guid? Id, Guid ProductId, string? Name, bool IsDisabled);
-
-public record EventConsumerResponse(
-    Guid? Id,
-    Guid TenantId,
-    string Name,
-    string? Description,
-    string Endpoint,
-    string? AuthorizationType,
-    object? AuthorizationParameters,
-    bool IsDisabled,
-    DateTimeOffset? LastSyncDate,
-    string? LastSyncMessage,
-    string? CreatedBy,
-    DateTimeOffset Created,
-    string? LastModifiedBy,
-    DateTimeOffset LastModified,
-    int Version);
-
-public record EventTypeResponse(
-    Guid Id,
-    Guid ProductId,
-    string? Name,
-    string? Description,
-    bool IsDisabled,
-    string? CreatedBy,
-    DateTimeOffset Created,
-    string? LastModifiedBy,
-    DateTimeOffset LastModified);
-
-public record EventTypeConsumerResponse(
-    Guid Id,
-    Guid ConsumerId,
-    string? ConsumerName,
-    string? ConsumerDescription,
-    string? ConsumerEndpoint,
-    string? ConsumerAuthorizationType,
-    Guid EventTypeId,
-    string? EventTypeName,
-    Guid TenantProductEnvironmentId,
-    Guid TenantId,
-    string? TenantName,
-    Guid ProductId,
-    string? ProductName,
-    string? ProductString,
-    string? EnvironmentName,
-    bool IsDisabled,
-    string? CreatedBy,
-    DateTimeOffset Created,
-    string? LastModifiedBy,
-    DateTimeOffset LastModified);
-
 public class TcmClient
 {
     private readonly HttpClient _http;
@@ -203,7 +92,7 @@ public class TcmClient
     }
 
     public Task<HttpResponseMessage> TestOAuthCredentialsAsync(Guid id) =>
-        _http.PostAsync($"v1/EventConsumer/{id}/_testOAuthCredentials", content: null);
+        _http.GetAsync($"v1/EventConsumer/{id}/_testOAuthCredentials");
 
     public Task<EventTypeResponse[]?> GetEventTypesAsync() =>
         GetAsync("v1/EventType", SymplrJsonContext.Default.EventTypeResponseArray);
