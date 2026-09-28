@@ -40,6 +40,9 @@ public static class Formatter
         Console.WriteLine(string.Join("  ", parts).TrimEnd());
     }
 
+    public static void PrintCount(int count) =>
+        Console.WriteLine($"\n{count} {(count == 1 ? "record" : "records")} returned.");
+
     public static void PrintJson<T>(T data, JsonTypeInfo<T> typeInfo) =>
         Console.WriteLine(JsonSerializer.Serialize(data, typeInfo));
 
