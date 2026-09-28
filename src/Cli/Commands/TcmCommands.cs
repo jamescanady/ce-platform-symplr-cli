@@ -35,6 +35,8 @@ public static class TcmCommands
         var eventConsumers = new Command("event-consumers", "Manage event consumers");
         eventConsumers.Subcommands.Add(BuildEventConsumersListCommand(envOption));
         eventConsumers.Subcommands.Add(BuildEventConsumersGetCommand(envOption));
+        eventConsumers.Subcommands.Add(BuildEventConsumersSyncCommand(envOption));
+        eventConsumers.Subcommands.Add(BuildEventConsumersTestOAuthCommand(envOption));
 
         var eventTypes = new Command("event-types", "Manage event types");
         eventTypes.Subcommands.Add(BuildEventTypesListCommand(envOption));
@@ -63,19 +65,24 @@ public static class TcmCommands
         {
             Description = "Include product relationships",
         };
+        var includeDisabled = new Option<bool>("--include-disabled") { Description = "Include disabled records" };
         var output = OutputOption();
         var cmd = new Command("list", "List all tenants");
         cmd.Options.Add(withProducts);
+        cmd.Options.Add(includeDisabled);
         cmd.Options.Add(output);
         cmd.SetAction(async (parseResult, ct) =>
         {
-            var env = parseResult.GetValue(envOption);
-            var wp  = parseResult.GetValue(withProducts);
-            var fmt = parseResult.GetValue(output);
+            var env         = parseResult.GetValue(envOption);
+            var wp          = parseResult.GetValue(withProducts);
+            var showDisabled = parseResult.GetValue(includeDisabled);
+            var fmt         = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var tenants = await client.GetTenantsAsync(wp);
                 if (tenants is null || tenants.Length == 0) { Console.WriteLine("No tenants found."); return; }
+                if (!showDisabled) tenants = tenants.Where(t => !t.IsDisabled).ToArray();
+                if (tenants.Length == 0) { Console.WriteLine("No active tenants found. Use --include-disabled to show all."); return; }
 
                 if (fmt == OutputFormat.Json)
                 {
@@ -93,6 +100,7 @@ public static class TcmCommands
                         t.GlobalTenantCode,
                         t.IsDisabled ? "yes" : "no",
                     }));
+                Formatter.PrintCount(tenants.Length);
             });
         });
         return cmd;
@@ -141,19 +149,24 @@ public static class TcmCommands
         {
             Description = "Search against name, description, shortCode, and globalTenantCode",
         };
+        var includeDisabled = new Option<bool>("--include-disabled") { Description = "Include disabled records" };
         var output = OutputOption();
         var cmd = new Command("search", "Search tenants by name, short code, or global code");
         cmd.Arguments.Add(needleArg);
+        cmd.Options.Add(includeDisabled);
         cmd.Options.Add(output);
         cmd.SetAction(async (parseResult, ct) =>
         {
-            var env    = parseResult.GetValue(envOption);
-            var needle = parseResult.GetValue(needleArg)!;
-            var fmt    = parseResult.GetValue(output);
+            var env         = parseResult.GetValue(envOption);
+            var needle      = parseResult.GetValue(needleArg)!;
+            var showDisabled = parseResult.GetValue(includeDisabled);
+            var fmt         = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var tenants = await client.FindTenantsAsync(needle);
                 if (tenants is null || tenants.Length == 0) { Console.WriteLine("No matching tenants."); return; }
+                if (!showDisabled) tenants = tenants.Where(t => !t.IsDisabled).ToArray();
+                if (tenants.Length == 0) { Console.WriteLine("No active matching tenants. Use --include-disabled to show all."); return; }
 
                 if (fmt == OutputFormat.Json)
                 {
@@ -171,6 +184,7 @@ public static class TcmCommands
                         t.GlobalTenantCode,
                         t.IsDisabled ? "yes" : "no",
                     }));
+                Formatter.PrintCount(tenants.Length);
             });
         });
         return cmd;
@@ -190,30 +204,27 @@ public static class TcmCommands
             var fmt = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
-                var results = await client.GetTenantNamespacesAsync(id);
-                if (results is null || results.Length == 0) { Console.WriteLine("No namespaces found for tenant."); return; }
+                var result = await client.GetTenantNamespacesAsync(id);
+                if (result is null) { Console.WriteLine("No namespaces found for tenant."); return; }
 
                 if (fmt == OutputFormat.Json)
                 {
-                    Formatter.PrintJson(results, SymplrJsonContext.Default.TenantNamespaceResponseArray);
+                    Formatter.PrintJson(result, SymplrJsonContext.Default.TenantNamespaceResponse);
                     return;
                 }
 
-                foreach (var tenant in results)
+                Console.WriteLine($"Tenant: {result.TenantName} ({result.TenantId})");
+                foreach (var ns in result.Namespaces ?? [])
                 {
-                    Console.WriteLine($"Tenant: {tenant.TenantName} ({tenant.TenantId})");
-                    foreach (var ns in tenant.Namespaces ?? [])
-                    {
-                        Console.WriteLine($"  Namespace: {ns.Namespace} ({ns.NamespaceId})");
-                        Formatter.PrintTable(
-                            ["  PRODUCT", "ENVIRONMENT", "PRODUCT ENV ID"],
-                            (ns.Products ?? []).Select(p => new[]
-                            {
-                                $"  {p.ProductName}",
-                                p.EnvironmentName ?? "",
-                                p.ProductEnvironmentId.ToString(),
-                            }));
-                    }
+                    Console.WriteLine($"  Namespace: {ns.Namespace} ({ns.NamespaceId})");
+                    Formatter.PrintTable(
+                        ["  PRODUCT", "ENVIRONMENT", "PRODUCT ENV ID"],
+                        (ns.Products ?? []).Select(p => new[]
+                        {
+                            $"  {p.ProductName}",
+                            p.EnvironmentName ?? "",
+                            p.ProductEnvironmentId.ToString(),
+                        }));
                 }
             });
         });
@@ -224,22 +235,19 @@ public static class TcmCommands
 
     private static Command BuildNamespacesListCommand(Option<SymplrEnvironment> envOption)
     {
-        var includeInactive = new Option<bool>("--include-inactive")
-        {
-            Description = "Include disabled/deleted namespaces",
-        };
+        var includeDisabled = new Option<bool>("--include-disabled") { Description = "Include disabled namespaces" };
         var output = OutputOption();
         var cmd    = new Command("list", "List all namespaces");
-        cmd.Options.Add(includeInactive);
+        cmd.Options.Add(includeDisabled);
         cmd.Options.Add(output);
         cmd.SetAction(async (parseResult, ct) =>
         {
-            var env      = parseResult.GetValue(envOption);
-            var inactive = parseResult.GetValue(includeInactive);
-            var fmt      = parseResult.GetValue(output);
+            var env         = parseResult.GetValue(envOption);
+            var showDisabled = parseResult.GetValue(includeDisabled);
+            var fmt         = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
-                var namespaces = await client.GetNamespacesAsync(inactive);
+                var namespaces = await client.GetNamespacesAsync(showDisabled);
                 if (namespaces is null || namespaces.Length == 0) { Console.WriteLine("No namespaces found."); return; }
 
                 if (fmt == OutputFormat.Json)
@@ -249,15 +257,17 @@ public static class TcmCommands
                 }
 
                 Formatter.PrintTable(
-                    ["ID", "NAME", "DESCRIPTION", "DEFAULT", "DISABLED"],
+                    ["ID", "NAME", "SHORT CODE", "DESCRIPTION", "DEFAULT", "DISABLED"],
                     namespaces.Select(n => new[]
                     {
                         n.Id.ToString(),
                         n.Name ?? "",
+                        n.ShortCode ?? "",
                         n.Description ?? "",
                         n.IsDefault ? "yes" : "no",
                         n.IsDisabled ? "yes" : "no",
                     }));
+                Formatter.PrintCount(namespaces.Length);
             });
         });
         return cmd;
@@ -291,6 +301,7 @@ public static class TcmCommands
                     [
                         ["Id",           ns.Id.ToString()],
                         ["Name",         ns.Name ?? ""],
+                        ["Short Code",   ns.ShortCode ?? ""],
                         ["Description",  ns.Description ?? ""],
                         ["Default",      ns.IsDefault ? "yes" : "no"],
                         ["Disabled",     ns.IsDisabled ? "yes" : "no"],
@@ -308,17 +319,22 @@ public static class TcmCommands
 
     private static Command BuildProductsListCommand(Option<SymplrEnvironment> envOption)
     {
+        var includeDisabled = new Option<bool>("--include-disabled") { Description = "Include disabled records" };
         var output = OutputOption();
         var cmd    = new Command("list", "List all products");
+        cmd.Options.Add(includeDisabled);
         cmd.Options.Add(output);
         cmd.SetAction(async (parseResult, ct) =>
         {
-            var env = parseResult.GetValue(envOption);
-            var fmt = parseResult.GetValue(output);
+            var env         = parseResult.GetValue(envOption);
+            var showDisabled = parseResult.GetValue(includeDisabled);
+            var fmt         = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var products = await client.GetProductsAsync();
                 if (products is null || products.Length == 0) { Console.WriteLine("No products found."); return; }
+                if (!showDisabled) products = products.Where(p => !p.IsDisabled).ToArray();
+                if (products.Length == 0) { Console.WriteLine("No active products found. Use --include-disabled to show all."); return; }
 
                 if (fmt == OutputFormat.Json)
                 {
@@ -335,6 +351,7 @@ public static class TcmCommands
                         p.Description,
                         p.IsDisabled ? "yes" : "no",
                     }));
+                Formatter.PrintCount(products.Length);
             });
         });
         return cmd;
@@ -378,20 +395,25 @@ public static class TcmCommands
 
     private static Command BuildProductsSearchCommand(Option<SymplrEnvironment> envOption)
     {
-        var needleArg = new Argument<string>("query") { Description = "Search against product name" };
-        var output    = OutputOption();
-        var cmd       = new Command("search", "Search products by name");
+        var needleArg       = new Argument<string>("query") { Description = "Search against product name" };
+        var includeDisabled = new Option<bool>("--include-disabled") { Description = "Include disabled records" };
+        var output          = OutputOption();
+        var cmd             = new Command("search", "Search products by name");
         cmd.Arguments.Add(needleArg);
+        cmd.Options.Add(includeDisabled);
         cmd.Options.Add(output);
         cmd.SetAction(async (parseResult, ct) =>
         {
-            var env    = parseResult.GetValue(envOption);
-            var needle = parseResult.GetValue(needleArg)!;
-            var fmt    = parseResult.GetValue(output);
+            var env         = parseResult.GetValue(envOption);
+            var needle      = parseResult.GetValue(needleArg)!;
+            var showDisabled = parseResult.GetValue(includeDisabled);
+            var fmt         = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var products = await client.FindProductsAsync(needle);
                 if (products is null || products.Length == 0) { Console.WriteLine("No matching products."); return; }
+                if (!showDisabled) products = products.Where(p => !p.IsDisabled).ToArray();
+                if (products.Length == 0) { Console.WriteLine("No active matching products. Use --include-disabled to show all."); return; }
 
                 if (fmt == OutputFormat.Json)
                 {
@@ -408,6 +430,7 @@ public static class TcmCommands
                         p.Description,
                         p.IsDisabled ? "yes" : "no",
                     }));
+                Formatter.PrintCount(products.Length);
             });
         });
         return cmd;
@@ -452,6 +475,7 @@ public static class TcmCommands
                         t.NameSpace ?? "",
                         t.EnvironmentName ?? "",
                     }));
+                Formatter.PrintCount(tenants.Length);
             });
         });
         return cmd;
@@ -459,20 +483,25 @@ public static class TcmCommands
 
     private static Command BuildProductsEnvironmentsCommand(Option<SymplrEnvironment> envOption)
     {
-        var idArg  = new Argument<Guid>("id") { Description = "Product ID (UUID)" };
-        var output = OutputOption();
-        var cmd    = new Command("environments", "List environments for a product");
+        var idArg           = new Argument<Guid>("id") { Description = "Product ID (UUID)" };
+        var includeDisabled = new Option<bool>("--include-disabled") { Description = "Include disabled records" };
+        var output          = OutputOption();
+        var cmd             = new Command("environments", "List environments for a product");
         cmd.Arguments.Add(idArg);
+        cmd.Options.Add(includeDisabled);
         cmd.Options.Add(output);
         cmd.SetAction(async (parseResult, ct) =>
         {
-            var env = parseResult.GetValue(envOption);
-            var id  = parseResult.GetValue(idArg);
-            var fmt = parseResult.GetValue(output);
+            var env         = parseResult.GetValue(envOption);
+            var id          = parseResult.GetValue(idArg);
+            var showDisabled = parseResult.GetValue(includeDisabled);
+            var fmt         = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var envs = await client.GetProductEnvironmentsAsync(id);
                 if (envs is null || envs.Length == 0) { Console.WriteLine("No environments found for product."); return; }
+                if (!showDisabled) envs = envs.Where(e => !e.IsDisabled).ToArray();
+                if (envs.Length == 0) { Console.WriteLine("No active environments found. Use --include-disabled to show all."); return; }
 
                 if (fmt == OutputFormat.Json)
                 {
@@ -488,6 +517,7 @@ public static class TcmCommands
                         e.Name ?? "",
                         e.IsDisabled ? "yes" : "no",
                     }));
+                Formatter.PrintCount(envs.Length);
             });
         });
         return cmd;
@@ -497,17 +527,22 @@ public static class TcmCommands
 
     private static Command BuildEventConsumersListCommand(Option<SymplrEnvironment> envOption)
     {
-        var output = OutputOption();
-        var cmd    = new Command("list", "List all event consumers");
+        var includeDisabled = new Option<bool>("--include-disabled") { Description = "Include disabled records" };
+        var output          = OutputOption();
+        var cmd             = new Command("list", "List all event consumers");
+        cmd.Options.Add(includeDisabled);
         cmd.Options.Add(output);
         cmd.SetAction(async (parseResult, ct) =>
         {
-            var env = parseResult.GetValue(envOption);
-            var fmt = parseResult.GetValue(output);
+            var env          = parseResult.GetValue(envOption);
+            var showDisabled = parseResult.GetValue(includeDisabled);
+            var fmt          = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var consumers = await client.GetEventConsumersAsync();
                 if (consumers is null || consumers.Length == 0) { Console.WriteLine("No event consumers found."); return; }
+                if (!showDisabled) consumers = consumers.Where(c => !c.IsDisabled).ToArray();
+                if (consumers.Length == 0) { Console.WriteLine("No active event consumers found. Use --include-disabled to show all."); return; }
 
                 if (fmt == OutputFormat.Json)
                 {
@@ -525,6 +560,7 @@ public static class TcmCommands
                         c.AuthorizationType ?? "",
                         c.IsDisabled ? "yes" : "no",
                     }));
+                Formatter.PrintCount(consumers.Length);
             });
         });
         return cmd;
@@ -560,15 +596,74 @@ public static class TcmCommands
                         ["Tenant Id",    consumer.TenantId.ToString()],
                         ["Name",         consumer.Name],
                         ["Description",  consumer.Description ?? ""],
-                        ["Endpoint",     consumer.Endpoint],
-                        ["Auth Type",    consumer.AuthorizationType ?? ""],
-                        ["Disabled",     consumer.IsDisabled ? "yes" : "no"],
-                        ["Version",      consumer.Version.ToString()],
-                        ["Created",      consumer.Created.ToLocalTime().ToString("yyyy-MM-dd HH:mm")],
-                        ["Created By",   consumer.CreatedBy ?? ""],
-                        ["Modified",     consumer.LastModified.ToLocalTime().ToString("yyyy-MM-dd HH:mm")],
+                        ["Endpoint",        consumer.Endpoint],
+                        ["Auth Type",       consumer.AuthorizationType ?? ""],
+                        ["Disabled",        consumer.IsDisabled ? "yes" : "no"],
+                        ["Last Sync",       consumer.LastSyncDate?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? ""],
+                        ["Last Sync Msg",   consumer.LastSyncMessage ?? ""],
+                        ["Version",         consumer.Version.ToString()],
+                        ["Created",         consumer.Created.ToLocalTime().ToString("yyyy-MM-dd HH:mm")],
+                        ["Created By",      consumer.CreatedBy ?? ""],
+                        ["Modified",        consumer.LastModified.ToLocalTime().ToString("yyyy-MM-dd HH:mm")],
                         ["Modified By",  consumer.LastModifiedBy ?? ""],
                     ]);
+            });
+        });
+        return cmd;
+    }
+
+    private static Command BuildEventConsumersTestOAuthCommand(Option<SymplrEnvironment> envOption)
+    {
+        var consumerIdOption = new Option<Guid>("--consumer-id")
+        {
+            Description = "Event Consumer ID (UUID)",
+            Required    = true,
+        };
+        var cmd = new Command("test-oauth", "Test OAuth credentials for an event consumer");
+        cmd.Options.Add(consumerIdOption);
+        cmd.SetAction(async (parseResult, ct) =>
+        {
+            var env        = parseResult.GetValue(envOption);
+            var consumerId = parseResult.GetValue(consumerIdOption);
+            await RunTcmAsync(env, async client =>
+            {
+                var response = await client.TestOAuthCredentialsAsync(consumerId);
+                var body     = await response.Content.ReadAsStringAsync(ct);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"OAuth credentials test passed ({(int)response.StatusCode} {response.ReasonPhrase}).");
+                    if (!string.IsNullOrWhiteSpace(body))
+                        Console.WriteLine(body);
+                }
+                else
+                {
+                    Formatter.Error($"OAuth credentials test failed: {(int)response.StatusCode} {response.ReasonPhrase}");
+                    if (!string.IsNullOrWhiteSpace(body))
+                        Console.Error.WriteLine(body);
+                }
+            });
+        });
+        return cmd;
+    }
+
+    private static Command BuildEventConsumersSyncCommand(Option<SymplrEnvironment> envOption)
+    {
+        var consumerIdOption = new Option<Guid>("--consumer-id")
+        {
+            Description = "Event Consumer ID (UUID)",
+            Required    = true,
+        };
+        var cmd = new Command("sync", "Trigger an immediate sync for an event consumer");
+        cmd.Options.Add(consumerIdOption);
+        cmd.SetAction(async (parseResult, ct) =>
+        {
+            var env        = parseResult.GetValue(envOption);
+            var consumerId = parseResult.GetValue(consumerIdOption);
+            await RunTcmAsync(env, async client =>
+            {
+                await client.SyncEventConsumerAsync(consumerId);
+                Console.WriteLine($"Sync triggered for consumer {consumerId}.");
             });
         });
         return cmd;
@@ -578,17 +673,22 @@ public static class TcmCommands
 
     private static Command BuildEventTypesListCommand(Option<SymplrEnvironment> envOption)
     {
-        var output = OutputOption();
-        var cmd    = new Command("list", "List all event types");
+        var includeDisabled = new Option<bool>("--include-disabled") { Description = "Include disabled records" };
+        var output          = OutputOption();
+        var cmd             = new Command("list", "List all event types");
+        cmd.Options.Add(includeDisabled);
         cmd.Options.Add(output);
         cmd.SetAction(async (parseResult, ct) =>
         {
-            var env = parseResult.GetValue(envOption);
-            var fmt = parseResult.GetValue(output);
+            var env          = parseResult.GetValue(envOption);
+            var showDisabled = parseResult.GetValue(includeDisabled);
+            var fmt          = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var types = await client.GetEventTypesAsync();
                 if (types is null || types.Length == 0) { Console.WriteLine("No event types found."); return; }
+                if (!showDisabled) types = types.Where(t => !t.IsDisabled).ToArray();
+                if (types.Length == 0) { Console.WriteLine("No active event types found. Use --include-disabled to show all."); return; }
 
                 if (fmt == OutputFormat.Json)
                 {
@@ -605,6 +705,7 @@ public static class TcmCommands
                         t.ProductId.ToString(),
                         t.IsDisabled ? "yes" : "no",
                     }));
+                Formatter.PrintCount(types.Length);
             });
         });
         return cmd;
@@ -655,17 +756,22 @@ public static class TcmCommands
 
     private static Command BuildEventTypeConsumersListCommand(Option<SymplrEnvironment> envOption)
     {
-        var output = OutputOption();
-        var cmd    = new Command("list", "List all event type consumer mappings");
+        var includeDisabled = new Option<bool>("--include-disabled") { Description = "Include disabled records" };
+        var output          = OutputOption();
+        var cmd             = new Command("list", "List all event type consumer mappings");
+        cmd.Options.Add(includeDisabled);
         cmd.Options.Add(output);
         cmd.SetAction(async (parseResult, ct) =>
         {
-            var env = parseResult.GetValue(envOption);
-            var fmt = parseResult.GetValue(output);
+            var env          = parseResult.GetValue(envOption);
+            var showDisabled = parseResult.GetValue(includeDisabled);
+            var fmt          = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var mappings = await client.GetEventTypeConsumersAsync();
                 if (mappings is null || mappings.Length == 0) { Console.WriteLine("No event type consumer mappings found."); return; }
+                if (!showDisabled) mappings = mappings.Where(m => !m.IsDisabled).ToArray();
+                if (mappings.Length == 0) { Console.WriteLine("No active event type consumer mappings found. Use --include-disabled to show all."); return; }
 
                 if (fmt == OutputFormat.Json)
                 {
@@ -685,6 +791,7 @@ public static class TcmCommands
                         m.EnvironmentName ?? "",
                         m.IsDisabled ? "yes" : "no",
                     }));
+                Formatter.PrintCount(mappings.Length);
             });
         });
         return cmd;
@@ -743,20 +850,25 @@ public static class TcmCommands
 
     private static Command BuildEventTypeConsumersByConsumerCommand(Option<SymplrEnvironment> envOption)
     {
-        var idArg  = new Argument<Guid>("consumer-id") { Description = "Event Consumer ID (UUID)" };
-        var output = OutputOption();
-        var cmd    = new Command("by-consumer", "List all event type mappings for a given event consumer");
+        var idArg           = new Argument<Guid>("consumer-id") { Description = "Event Consumer ID (UUID)" };
+        var includeDisabled = new Option<bool>("--include-disabled") { Description = "Include disabled records" };
+        var output          = OutputOption();
+        var cmd             = new Command("by-consumer", "List all event type mappings for a given event consumer");
         cmd.Arguments.Add(idArg);
+        cmd.Options.Add(includeDisabled);
         cmd.Options.Add(output);
         cmd.SetAction(async (parseResult, ct) =>
         {
-            var env = parseResult.GetValue(envOption);
-            var id  = parseResult.GetValue(idArg);
-            var fmt = parseResult.GetValue(output);
+            var env          = parseResult.GetValue(envOption);
+            var id           = parseResult.GetValue(idArg);
+            var showDisabled = parseResult.GetValue(includeDisabled);
+            var fmt          = parseResult.GetValue(output);
             await RunTcmAsync(env, async client =>
             {
                 var mappings = await client.GetEventTypeConsumersByConsumerAsync(id);
                 if (mappings is null || mappings.Length == 0) { Console.WriteLine("No mappings found for event consumer."); return; }
+                if (!showDisabled) mappings = mappings.Where(m => !m.IsDisabled).ToArray();
+                if (mappings.Length == 0) { Console.WriteLine("No active mappings found. Use --include-disabled to show all."); return; }
 
                 if (fmt == OutputFormat.Json)
                 {
@@ -775,6 +887,7 @@ public static class TcmCommands
                         m.EnvironmentName ?? "",
                         m.IsDisabled ? "yes" : "no",
                     }));
+                Formatter.PrintCount(mappings.Length);
             });
         });
         return cmd;
