@@ -19,6 +19,7 @@ public record TenantProductResponse(Guid? Id, string Name, string Description, b
 public record NamespaceResponse(
     Guid Id,
     string? Name,
+    string? ShortCode,
     string? Description,
     bool IsDefault,
     bool IsDisabled,
@@ -73,8 +74,9 @@ public record EventConsumerResponse(
     string Endpoint,
     string? AuthorizationType,
     object? AuthorizationParameters,
-    object? InvocationHttpParameters,
     bool IsDisabled,
+    DateTimeOffset? LastSyncDate,
+    string? LastSyncMessage,
     string? CreatedBy,
     DateTimeOffset Created,
     string? LastModifiedBy,
@@ -143,8 +145,8 @@ public class TcmClient
     public Task<TenantResponse[]?> FindTenantsAsync(string needle) =>
         GetAsync($"v1/Tenant/find/{Uri.EscapeDataString(needle)}", SymplrJsonContext.Default.TenantResponseArray);
 
-    public Task<TenantNamespaceResponse[]?> GetTenantNamespacesAsync(Guid tenantId) =>
-        GetAsync($"v1/Tenant/{tenantId}/productEnvironmentsByNamespace", SymplrJsonContext.Default.TenantNamespaceResponseArray);
+    public Task<TenantNamespaceResponse?> GetTenantNamespacesAsync(Guid tenantId) =>
+        GetAsync($"v1/Tenant/{tenantId}/productEnvironmentsByNamespace", SymplrJsonContext.Default.TenantNamespaceResponse);
 
     public Task<NamespaceResponse[]?> GetNamespacesAsync(bool includeInactive = false) =>
         GetAsync($"v1/Namespace?includeInactive={includeInactive}", SymplrJsonContext.Default.NamespaceResponseArray);
@@ -193,6 +195,15 @@ public class TcmClient
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync(SymplrJsonContext.Default.EventConsumerResponse);
     }
+
+    public async Task SyncEventConsumerAsync(Guid id)
+    {
+        var response = await _http.PostAsync($"v1/EventConsumer/{id}/_syncNow", content: null);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public Task<HttpResponseMessage> TestOAuthCredentialsAsync(Guid id) =>
+        _http.PostAsync($"v1/EventConsumer/{id}/_testOAuthCredentials", content: null);
 
     public Task<EventTypeResponse[]?> GetEventTypesAsync() =>
         GetAsync("v1/EventType", SymplrJsonContext.Default.EventTypeResponseArray);
