@@ -304,6 +304,8 @@ symplr config unset route-prefix tcm
 
 All `tcm` subcommands require an active, non-expired token for the target environment. All support `--output table|json` (default: `table`).
 
+List and search commands hide disabled records by default. Pass `--include-disabled` to show them.
+
 ### `symplr tcm version`
 
 Show the deployed version of the TCM service. Does not require authentication.
@@ -327,12 +329,13 @@ symplr tcm version --output json
 List all tenants.
 
 ```
-symplr tcm tenants list [--with-products] [--output table|json] [--env <env>]
+symplr tcm tenants list [--with-products] [--include-disabled] [--output table|json] [--env <env>]
 ```
 
 | Option | Description |
 |--------|-------------|
 | `--with-products` | Include product relationships in the response |
+| `--include-disabled` | Include disabled tenants (hidden by default) |
 
 #### `symplr tcm tenants get <id>`
 
@@ -351,12 +354,13 @@ symplr tcm tenants get <id> [--with-products] [--output table|json] [--env <env>
 Search tenants by name, description, short code, or global tenant code.
 
 ```
-symplr tcm tenants search <query> [--output table|json] [--env <env>]
+symplr tcm tenants search <query> [--include-disabled] [--output table|json] [--env <env>]
 ```
 
-| Argument | Description |
-|----------|-------------|
+| Argument / Option | Description |
+|-------------------|-------------|
 | `query` | Search string matched against name, description, shortCode, and globalTenantCode |
+| `--include-disabled` | Include disabled tenants (hidden by default) |
 
 #### `symplr tcm tenants namespaces <id>`
 
@@ -379,12 +383,12 @@ symplr tcm tenants namespaces <id> [--output table|json] [--env <env>]
 List all namespaces.
 
 ```
-symplr tcm namespaces list [--include-inactive] [--output table|json] [--env <env>]
+symplr tcm namespaces list [--include-disabled] [--output table|json] [--env <env>]
 ```
 
 | Option | Description |
 |--------|-------------|
-| `--include-inactive` | Include disabled and deleted namespaces |
+| `--include-disabled` | Include inactive/disabled namespaces (hidden by default) |
 
 #### `symplr tcm namespaces get <id>`
 
@@ -407,8 +411,12 @@ symplr tcm namespaces get <id> [--output table|json] [--env <env>]
 List all products.
 
 ```
-symplr tcm products list [--output table|json] [--env <env>]
+symplr tcm products list [--include-disabled] [--output table|json] [--env <env>]
 ```
+
+| Option | Description |
+|--------|-------------|
+| `--include-disabled` | Include disabled products (hidden by default) |
 
 #### `symplr tcm products get <id>`
 
@@ -427,12 +435,13 @@ symplr tcm products get <id> [--output table|json] [--env <env>]
 Search products by name.
 
 ```
-symplr tcm products search <query> [--output table|json] [--env <env>]
+symplr tcm products search <query> [--include-disabled] [--output table|json] [--env <env>]
 ```
 
-| Argument | Description |
-|----------|-------------|
+| Argument / Option | Description |
+|-------------------|-------------|
 | `query` | Search string matched against product name |
+| `--include-disabled` | Include disabled products (hidden by default) |
 
 #### `symplr tcm products tenants <id>`
 
@@ -453,12 +462,13 @@ symplr tcm products tenants <id> [--filter <text>] [--namespace <name>] [--outpu
 List environments for a specific product.
 
 ```
-symplr tcm products environments <id> [--output table|json] [--env <env>]
+symplr tcm products environments <id> [--include-disabled] [--output table|json] [--env <env>]
 ```
 
-| Argument | Description |
-|----------|-------------|
+| Argument / Option | Description |
+|-------------------|-------------|
 | `id` | Product UUID |
+| `--include-disabled` | Include disabled environments (hidden by default) |
 
 ---
 
@@ -469,8 +479,12 @@ symplr tcm products environments <id> [--output table|json] [--env <env>]
 List all event consumers.
 
 ```
-symplr tcm event-consumers list [--output table|json] [--env <env>]
+symplr tcm event-consumers list [--include-disabled] [--output table|json] [--env <env>]
 ```
+
+| Option | Description |
+|--------|-------------|
+| `--include-disabled` | Include disabled event consumers (hidden by default) |
 
 #### `symplr tcm event-consumers get <id>`
 
@@ -484,6 +498,30 @@ symplr tcm event-consumers get <id> [--output table|json] [--env <env>]
 |----------|-------------|
 | `id` | Event Consumer UUID |
 
+#### `symplr tcm event-consumers sync`
+
+Trigger an immediate sync for an event consumer.
+
+```
+symplr tcm event-consumers sync --consumer-id <uuid> [--env <env>]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--consumer-id <uuid>` | Event Consumer UUID (required) |
+
+#### `symplr tcm event-consumers test-oauth`
+
+Test the OAuth credentials configured for an event consumer. Prints the server response on both success and failure.
+
+```
+symplr tcm event-consumers test-oauth --consumer-id <uuid> [--env <env>]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--consumer-id <uuid>` | Event Consumer UUID (required) |
+
 ---
 
 ### Event Types
@@ -493,8 +531,12 @@ symplr tcm event-consumers get <id> [--output table|json] [--env <env>]
 List all event types.
 
 ```
-symplr tcm event-types list [--output table|json] [--env <env>]
+symplr tcm event-types list [--include-disabled] [--output table|json] [--env <env>]
 ```
+
+| Option | Description |
+|--------|-------------|
+| `--include-disabled` | Include disabled event types (hidden by default) |
 
 #### `symplr tcm event-types get <id>`
 
@@ -519,8 +561,12 @@ Mappings between event types and the consumers that receive them.
 List all event type consumer mappings.
 
 ```
-symplr tcm event-type-consumers list [--output table|json] [--env <env>]
+symplr tcm event-type-consumers list [--include-disabled] [--output table|json] [--env <env>]
 ```
+
+| Option | Description |
+|--------|-------------|
+| `--include-disabled` | Include disabled mappings (hidden by default) |
 
 #### `symplr tcm event-type-consumers get <id>`
 
@@ -539,12 +585,13 @@ symplr tcm event-type-consumers get <id> [--output table|json] [--env <env>]
 List all event type mappings for a given event consumer.
 
 ```
-symplr tcm event-type-consumers by-consumer <consumer-id> [--output table|json] [--env <env>]
+symplr tcm event-type-consumers by-consumer <consumer-id> [--include-disabled] [--output table|json] [--env <env>]
 ```
 
-| Argument | Description |
-|----------|-------------|
+| Argument / Option | Description |
+|-------------------|-------------|
 | `consumer-id` | Event Consumer UUID |
+| `--include-disabled` | Include disabled mappings (hidden by default) |
 
 ---
 
