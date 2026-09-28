@@ -200,6 +200,7 @@ public static class BeeCommands
                             e.ErrorCode     ?? "",
                             e.CorrelationId ?? "",
                         }));
+                    Formatter.PrintCount(events.Length);
 
                     if (events.Any(e => !string.IsNullOrEmpty(e.ErrorMessage)))
                     {
