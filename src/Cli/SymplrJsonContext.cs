@@ -25,4 +25,9 @@ namespace SymplrCli;
 [JsonSerializable(typeof(DeviceAuthResponse))]
 [JsonSerializable(typeof(DeviceFlowError))]
 [JsonSerializable(typeof(ServiceVersionResponse))]
+[JsonSerializable(typeof(BeeEventRequest))]
+[JsonSerializable(typeof(BeeDefaultPayloadItem))]
+[JsonSerializable(typeof(System.Text.Json.JsonElement[]))]
+[JsonSerializable(typeof(AuditSearchResponse))]
+[JsonSerializable(typeof(AuditRecordResponse[]))]
 internal partial class SymplrJsonContext : JsonSerializerContext { }

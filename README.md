@@ -548,6 +548,111 @@ symplr tcm event-type-consumers by-consumer <consumer-id> [--output table|json] 
 
 ---
 
+## Event Engine (BEE)
+
+All `bee` subcommands require an active, non-expired token for the target environment unless noted otherwise.
+
+### `symplr bee version`
+
+Show the deployed version of the Event Engine Validation service. Does not require authentication.
+
+```
+symplr bee version [--output table|json] [--env <env>]
+```
+
+```bash
+symplr bee version
+symplr bee version --env production
+symplr bee version --output json
+```
+
+---
+
+### `symplr bee event`
+
+Submit a single event to the Event Engine. Any option not supplied on the command line will be prompted interactively.
+
+```
+symplr bee event [--tenant-id <uuid>] [--product-name <name>] [--event-name <name>] [--env <env>]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--tenant-id <uuid>` | Tenant ID |
+| `--product-name <name>` | Product name |
+| `--event-name <name>` | Event name / type |
+| `--payload <json>` | JSON payload as an object or array of objects (see below) |
+
+The `environment` field sent in the request body is prompted with the current `--env` value as the default.
+
+On success, prints the correlation ID returned by the server.
+
+#### Payload
+
+`--payload` accepts a JSON object or a JSON array of objects. A single object is automatically wrapped in an array. If omitted, a default sample payload is used:
+
+```json
+[{ "userName": "John Smith", "id": "<generated-uuid>" }]
+```
+
+```bash
+# Fully interactive — prompts for all fields, uses default payload
+symplr bee event
+
+# Partially specified, default payload
+symplr bee event --tenant-id 00000000-0000-0000-0000-000000000000 --product-name MyProduct
+
+# Single object payload (wrapped in array automatically)
+symplr bee event --event-name MyEvent --payload '{"userId":"abc","action":"login"}'
+
+# Array of objects
+symplr bee event --event-name MyEvent --payload '[{"userId":"abc"},{"userId":"def"}]'
+```
+
+---
+
+### `symplr bee audits`
+
+Query Event Engine audit records. Exactly one filter group must be provided.
+
+```
+symplr bee audits (--correlation-id <id> | --consumer-id <id> | --tenant-id <id> --product-name <name> [--environment <env>])
+                  [--output table|json] [--watch] [--interval <seconds>] [--env <env>]
+```
+
+**Filter groups (mutually exclusive):**
+
+| Option(s) | Description |
+|-----------|-------------|
+| `--correlation-id <id>` | Look up a specific event by its correlation ID |
+| `--consumer-id <id>` | All audit records for a consumer |
+| `--tenant-id <id> --product-name <name>` | All audit records for a tenant + product. `--environment` defaults to the current `--env` value |
+
+**Other options:**
+
+| Option | Description |
+|--------|-------------|
+| `--environment <env>` | Environment filter string (used with `--tenant-id`, defaults to current `--env`) |
+| `--output table\|json` | Output format (default: `table`) |
+| `--watch` | Continuously refresh results until Ctrl+C |
+| `--interval <seconds>` | Refresh interval when using `--watch` (default: `5`) |
+
+```bash
+# Look up a specific event
+symplr bee audits --correlation-id 00000000-0000-0000-0000-000000000000
+
+# All records for a consumer
+symplr bee audits --consumer-id 00000000-0000-0000-0000-000000000000
+
+# All records for a tenant + product in the current environment
+symplr bee audits --tenant-id 00000000-0000-0000-0000-000000000000 --product-name MyProduct
+
+# Watch mode — refresh every 10 seconds
+symplr bee audits --consumer-id 00000000-0000-0000-0000-000000000000 --watch --interval 10
+```
+
+---
+
 ## Output formats
 
 All data commands support `--output table` (default) and `--output json`.

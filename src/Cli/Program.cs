@@ -21,6 +21,7 @@ var root = new RootCommand("symplr CLI — query symplr Platform services");
 root.Options.Add(envOption);
 root.Subcommands.Add(AuthCommands.Build(envOption));
 root.Subcommands.Add(TcmCommands.Build(envOption));
+root.Subcommands.Add(BeeCommands.Build(envOption));
 root.Subcommands.Add(ConfigCommands.Build(envOption));
 
 return root.Parse(args).Invoke();
